@@ -2,39 +2,68 @@
   <div>
     <!-- 絞り込みフォーム -->
     <div class="mb-8">
-      <div class="bg-white border border-gray-200 rounded-lg shadow-sm p-6">
-        <h3 class="text-lg font-semibold text-gray-900 mb-6">
-          自治体検索
-        </h3>
+      <div class="bg-white border border-gray-200 rounded-lg shadow-sm">
+        <!-- ヘッダー部分（折りたたみボタン付き） -->
+        <div class="p-4 border-b border-gray-100">
+          <div class="flex items-center justify-between">
+            <h3 class="text-lg font-semibold text-gray-900">
+              検索
+            </h3>
+            <button
+              @click="toggleCollapsed"
+              class="flex items-center px-3 py-1 text-sm text-gray-600 hover:text-gray-900 hover:bg-gray-50 rounded-lg transition-colors"
+              :title="isCollapsed ? '検索フォームを表示' : '検索フォームを非表示'"
+            >
+              <svg 
+                class="w-4 h-4 transition-transform duration-200"
+                :class="{ 'rotate-180': !isCollapsed }"
+                fill="none" 
+                stroke="currentColor" 
+                viewBox="0 0 24 24"
+              >
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
+              </svg>
+            </button>
+          </div>
+        </div>
+        
+        <!-- フォーム内容（折りたたみ可能） -->
+        <div 
+          class="transition-all duration-300 ease-in-out overflow-hidden"
+          :class="isCollapsed ? 'max-h-0' : 'max-h-[500px]'"
+        >
+          <div class="p-6">
         
         <div class="grid grid-cols-1 lg:grid-cols-4 gap-6">
           <!-- キーワード検索 -->
           <div class="lg:col-span-2">
-            <label for="search-input" class="text-sm font-medium text-gray-700 mb-2 block">
-              キーワード検索
-            </label>
-            <input
-              id="search-input"
-              name="search"
-              v-model="searchQuery"
-              type="text"
-              placeholder="市区町村名、郡名、都道府県名、読み仮名で検索..."
-              class="w-full px-4 py-3 border-2 border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-base bg-white"
-              aria-describedby="search-help"
-            />
+            <div class="flex items-center gap-3">
+              <label for="search-input" class="text-sm font-medium text-gray-700 whitespace-nowrap min-w-[100px]">
+                キーワード検索
+              </label>
+              <input
+                id="search-input"
+                name="search"
+                v-model="searchQuery"
+                type="text"
+                placeholder="市区町村名、郡名、都道府県名、読み仮名で検索..."
+                class="flex-1 px-4 py-3 border-2 border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-base bg-white"
+                aria-describedby="search-help"
+              />
+            </div>
           </div>
           
           <!-- 自治体の状態フィルター -->
           <div>
-            <label class="text-sm font-medium text-gray-700 mb-3 block">自治体の状態</label>
-            <div class="space-y-2">
+            <label class="text-sm font-medium text-gray-700 mb-2 block">自治体の状態</label>
+            <div class="flex gap-4">
               <label class="flex items-center gap-2 cursor-pointer p-2 rounded-lg hover:bg-gray-50">
                 <input 
                   type="checkbox" 
                   v-model="showExisting"
                   class="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
                 >
-                <span class="text-sm font-medium text-gray-700">現存自治体</span>
+                <span class="text-sm font-medium text-gray-700">現存</span>
               </label>
               <label class="flex items-center gap-2 cursor-pointer p-2 rounded-lg hover:bg-gray-50">
                 <input 
@@ -42,23 +71,23 @@
                   v-model="showExtinct"
                   class="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
                 >
-                <span class="text-sm font-medium text-gray-700">消滅自治体</span>
+                <span class="text-sm font-medium text-gray-700">消滅</span>
               </label>
             </div>
           </div>
 
           <!-- 地域フィルター -->
           <div>
-            <label class="text-sm font-medium text-gray-700 mb-3 block">地域</label>
-            <div class="space-y-3">
-              <div>
-                <label for="prefecture-filter" class="text-sm font-medium text-gray-700 mb-1 block">
+            <label class="text-sm font-medium text-gray-700 mb-2 block">地域</label>
+            <div class="space-y-2">
+              <div class="flex items-center gap-3">
+                <label for="prefecture-filter" class="text-sm font-medium text-gray-700 whitespace-nowrap min-w-[80px]">
                   都道府県
                 </label>
                 <select 
                   id="prefecture-filter"
                   v-model="selectedPrefecture"
-                  class="w-full px-3 py-2 border-2 border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm bg-white"
+                  class="flex-1 px-3 py-2 border-2 border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm bg-white"
                 >
                   <option value="">すべての都道府県</option>
                   <option 
@@ -70,15 +99,15 @@
                   </option>
                 </select>
               </div>
-              <div>
-                <label for="county-filter" class="text-sm font-medium text-gray-700 mb-1 block">
+              <div class="flex items-center gap-3">
+                <label for="county-filter" class="text-sm font-medium text-gray-700 whitespace-nowrap min-w-[80px]">
                   郡
                 </label>
                 <select 
                   id="county-filter"
                   v-model="selectedCounty"
                   :disabled="!selectedPrefecture"
-                  class="w-full px-3 py-2 border-2 border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 disabled:bg-gray-100 disabled:text-gray-500 text-sm bg-white"
+                  class="flex-1 px-3 py-2 border-2 border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 disabled:bg-gray-100 disabled:text-gray-500 text-sm bg-white"
                 >
                   <option value="">すべての郡</option>
                   <option 
@@ -94,18 +123,20 @@
           </div>
         </div>
 
-        <!-- アクションボタン -->
-        <div class="flex justify-between items-center pt-6 border-t border-gray-100 mt-6">
-          <div class="text-sm text-gray-600">
-            <span class="font-medium text-blue-600">{{ filteredCities.length }}</span>件の市区町村を表示中
+            <!-- アクションボタン -->
+            <div class="flex justify-between items-center pt-6 border-t border-gray-100 mt-6">
+              <div class="text-sm text-gray-600">
+                <span class="font-medium text-blue-600">{{ filteredCities.length }}</span>件の市区町村を表示中
+              </div>
+              <button
+                @click="resetFilters"
+                class="px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 border border-gray-300 rounded-lg hover:bg-gray-200 focus:outline-none focus:ring-2 focus:ring-gray-500 focus:ring-offset-2 transition-colors"
+                title="すべてのフィルターをリセット"
+              >
+                リセット
+              </button>
+            </div>
           </div>
-          <button
-            @click="resetFilters"
-            class="px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 border border-gray-300 rounded-lg hover:bg-gray-200 focus:outline-none focus:ring-2 focus:ring-gray-500 focus:ring-offset-2 transition-colors"
-            title="すべてのフィルターをリセット"
-          >
-            リセット
-          </button>
         </div>
       </div>
     </div>
@@ -133,6 +164,9 @@ const emit = defineEmits<Emits>()
 const dataStore = useDataStore()
 const searchQuery = ref('')
 
+// 折りたたみ状態
+const isCollapsed = ref(false)
+
 // フィルター設定
 const showExisting = ref(true)
 const showExtinct = ref(true)
@@ -150,6 +184,11 @@ const availableCounties = computed(() => {
 watch(selectedPrefecture, () => {
   selectedCounty.value = ''
 })
+
+// 折りたたみ状態を切り替え
+const toggleCollapsed = () => {
+  isCollapsed.value = !isCollapsed.value
+}
 
 // すべてのフィルターをリセット
 const resetFilters = () => {
