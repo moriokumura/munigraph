@@ -79,7 +79,6 @@ npm run preview
 ## 既知の問題とToDo
 
 ### 優先
-- GitHubでのバックアップ
 - web公開
 
 #### 元データ変換ミス・漏れ
