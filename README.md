@@ -78,8 +78,7 @@ npm run preview
 
 ## 既知の問題とToDo
 
-優先
-- ロジックの混乱を解消
+### 優先
 - GitHubでのバックアップ
 - web公開
 
