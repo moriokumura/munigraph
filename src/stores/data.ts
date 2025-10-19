@@ -12,19 +12,24 @@ export type County = z.infer<typeof CountyRow>
 export type City = z.infer<typeof CityRow>
 export type Change = z.infer<typeof EventRow>
 
+// CSVファイルを読み込んでパースする
 async function fetchCsv(path: string): Promise<Record<string, string>[]> {
-  console.log('Fetching CSV:', path)
   const res = await fetch(path)
   if (!res.ok) {
     throw new Error(`Failed to fetch ${path}: ${res.status} ${res.statusText}`)
   }
+  
   const text = await res.text()
-  console.log(`CSV ${path} loaded, size:`, text.length)
-  const parsed = Papa.parse<Record<string, string>>(text, { header: true, skipEmptyLines: true })
-  if (parsed.errors.length) {
-    console.warn('CSV parse warnings for', path, parsed.errors.slice(0, 3))
+  const parsed = Papa.parse<Record<string, string>>(text, { 
+    header: true, 
+    skipEmptyLines: true 
+  })
+  
+  // パースエラーがある場合は警告を表示
+  if (parsed.errors.length > 0) {
+    console.warn(`CSV parse warnings for ${path}:`, parsed.errors.slice(0, 3))
   }
-  console.log(`CSV ${path} parsed, rows:`, parsed.data.length)
+  
   return parsed.data
 }
 
@@ -329,81 +334,59 @@ export const useDataStore = defineStore('data', {
     },
     
     // 市区町村の直前と直後のイベントを取得
+    // 直前イベント: この市区町村が新設されたイベント
+    // 直後イベント: この市区町村が変化・消滅したイベント
     getAdjacentEvents(cityCode: string): { before: Change[], after: Change[] } {
-      console.log(`[getAdjacentEvents] Getting adjacent events for city: ${cityCode}`)
-      
-      // 直前のイベント（この市区町村が変化後となったイベント）
+      // 直前のイベント: この市区町村が変化後となったイベント（新設されたイベント）
       const afterEvents = this.eventsByAfter.get(cityCode) || []
       
-      // 最新の日付を取得
+      // 最新の日付のイベントを取得（複数ある場合は最新のもの）
       const latestDate = afterEvents.length > 0
         ? afterEvents.sort((a, b) => b.date.localeCompare(a.date))[0].date
         : null
       
-      // 最新の日付のすべてのイベントを取得
       const beforeEvents = latestDate
         ? afterEvents.filter(e => e.date === latestDate)
         : []
       
-      console.log(`[getAdjacentEvents] After events for ${cityCode}:`, afterEvents.length)
-      console.log(`[getAdjacentEvents] Initial beforeEvents length:`, beforeEvents.length)
-      
-      // 直前のイベントがない場合（initial など）、この市区町村が変化前となったイベントを探す
-      if (beforeEvents.length === 0) {
-        console.log(`[getAdjacentEvents] No after events found, checking before events for ${cityCode}`)
-        const beforeEventsAll = this.eventsByBefore.get(cityCode) || []
-        console.log(`[getAdjacentEvents] Before events all for ${cityCode}:`, beforeEventsAll.length)
-        
-        const latestBeforeDate = beforeEventsAll.length > 0
-          ? beforeEventsAll.sort((a, b) => b.date.localeCompare(a.date))[0].date
-          : null
-        
-        console.log(`[getAdjacentEvents] Latest before date:`, latestBeforeDate)
-        
-        if (latestBeforeDate) {
-          const latestBeforeEvents = beforeEventsAll.filter(e => e.date === latestBeforeDate)
-          console.log(`[getAdjacentEvents] Latest before events:`, latestBeforeEvents.length)
-          beforeEvents.push(...latestBeforeEvents)
-          
-          // 同じ日付で同じ変化後の市区町村コードのイベントも追加
-          const sameDateAfterCode = latestBeforeEvents[0]?.city_code_after
-          console.log(`[getAdjacentEvents] Same date after code:`, sameDateAfterCode)
-          
-          if (sameDateAfterCode) {
-            // eventsByAfterのキーはcity_code_afterなので、直接取得
-            const additionalEvents = this.eventsByAfter.get(sameDateAfterCode) || []
-            const filteredAdditionalEvents = additionalEvents.filter((e: Change) => e.date === latestBeforeDate)
-            console.log(`[getAdjacentEvents] Additional events found:`, filteredAdditionalEvents.length)
-            beforeEvents.push(...filteredAdditionalEvents)
-          }
-        }
-      }
-      
-      console.log(`[getAdjacentEvents] Before events (${latestDate}):`, beforeEvents.length)
-      
       // 直後のイベントを探す
-      // 1. この市区町村が変化前となったイベント（この市区町村が消滅したイベント）
       const beforeEventsAll = this.eventsByBefore.get(cityCode) || []
-      
-      // 時期別コードの場合、コードの日付より後のイベントのみを取得（時系列の整合性を保つため）
       const codeParts = cityCode.split('_')
       const codeDate = codeParts.length > 1 ? codeParts[1] : null
       
       let filteredBeforeEvents = beforeEventsAll
+      
       if (codeDate && codeDate !== 'initial') {
-        // コードの日付をYYYY-MM-DD形式に変換して比較
+        // 時期別コード（例：20201_20050101）の場合
+        // コードの日付より後のイベントのみを取得（時系列の整合性を保つ）
         const year = codeDate.substring(0, 4)
         const month = codeDate.substring(4, 6)
         const day = codeDate.substring(6, 8)
         const codeDateStr = `${year}-${month}-${day}`
         
         filteredBeforeEvents = beforeEventsAll.filter(e => e.date > codeDateStr)
-        console.log(`[getAdjacentEvents] Filtered before events from ${beforeEventsAll.length} to ${filteredBeforeEvents.length}`)
+      } else if (codeDate === 'initial') {
+        // initialコード（例：20581_initial）の場合
+        // この自治体が消滅するイベントを取得
+        const latestBeforeDate = beforeEventsAll.length > 0
+          ? beforeEventsAll.sort((a, b) => b.date.localeCompare(a.date))[0].date
+          : null
+        
+        if (latestBeforeDate) {
+          const latestBeforeEvents = beforeEventsAll.filter(e => e.date === latestBeforeDate)
+          const sameDateAfterCode = latestBeforeEvents[0]?.city_code_after
+          
+          if (sameDateAfterCode) {
+            // 同じ日付・同じ変化後自治体のすべてのイベントを取得
+            const additionalEvents = this.eventsByAfter.get(sameDateAfterCode) || []
+            filteredBeforeEvents = additionalEvents.filter((e: Change) => e.date === latestBeforeDate)
+          }
+        }
       }
       
-      // 2. この市区町村の次のバージョンが変化後となったイベントを探す
-      // 例：20201_20050101 の場合、20201_20100101 が変化後となったイベントを探す
-      const baseCode = codeParts[0] // 20201
+      // この市区町村の次のバージョンが変化後となったイベントを探す
+      // 例：20201_20050101 の場合、20201_20100101 が変化後となったイベント
+      const baseCode = codeParts[0]
       const futureAfterEvents: Change[] = []
       
       if (codeDate && codeDate !== 'initial') {
@@ -412,58 +395,35 @@ export const useDataStore = defineStore('data', {
         const day = codeDate.substring(6, 8)
         const codeDateStr = `${year}-${month}-${day}`
         
-        // この市区町村のより新しいバージョンを探す
-        // eventsByAfterのキーはcity_code_afterなので、直接検索
-        console.log(`[getAdjacentEvents] Looking for events after ${codeDateStr}`)
-        
-        // より新しい日付のイベントを探す
-        console.log(`[getAdjacentEvents] eventsByAfter keys:`, Array.from(this.eventsByAfter.keys()).slice(0, 10))
-        
-        // 18201で始まるキーを探す
-        const keysStartingWith18201 = Array.from(this.eventsByAfter.keys()).filter(key => String(key).startsWith('18201'))
-        console.log(`[getAdjacentEvents] Keys starting with 18201:`, keysStartingWith18201)
-        
-        // すべてのキーを確認
-        const allKeys = Array.from(this.eventsByAfter.keys())
-        console.log(`[getAdjacentEvents] Total keys:`, allKeys.length)
-        console.log(`[getAdjacentEvents] Sample keys:`, allKeys.slice(0, 20))
-        
-        // この市区町村のより新しいバージョンを動的に探す
-        // 同じベースコード（例：18201）でより新しい日付のイベントを検索
-        for (const [eventCode, event] of this.eventsByAfter.entries()) {
-          if (eventCode.startsWith(baseCode + '_') && event.date > codeDateStr) {
-            console.log(`[getAdjacentEvents] Found newer event:`, `${event.date} ${event.event_type} ${event.city_code_before}->${event.city_code_after}`)
-            // 同じ日付のすべてのイベントを取得（合併などで複数の自治体が同時に変化する場合）
-            const sameDateEvents = Array.from(this.eventsByAfter.values())
-              .filter((e: Change) => e.date === event.date && e.city_code_after === event.city_code_after) as Change[]
-            futureAfterEvents.push(...sameDateEvents)
-            break // 最初に見つかった日付のイベントのみを取得
+        // 同じベースコードでより新しい日付のイベントを検索
+        for (const [eventCode, events] of this.eventsByAfter.entries()) {
+          if (eventCode.startsWith(baseCode + '_')) {
+            for (const event of events) {
+              if (event.date > codeDateStr) {
+                // 同じ日付・同じ変化後自治体のすべてのイベントを取得
+                const sameDateAfterCode = event.city_code_after
+                const additionalEvents = this.eventsByAfter.get(sameDateAfterCode) || []
+                const sameDateEvents = additionalEvents.filter((e: Change) => e.date === event.date)
+                futureAfterEvents.push(...sameDateEvents)
+                break
+              }
+            }
+            if (futureAfterEvents.length > 0) break
           }
         }
       }
       
-      console.log(`[getAdjacentEvents] Filtered before events:`, filteredBeforeEvents.length)
-      console.log(`[getAdjacentEvents] Future after events:`, futureAfterEvents.length)
-      
-      // デバッグ：futureAfterEventsの詳細を確認
-      if (futureAfterEvents.length > 0) {
-        console.log(`[getAdjacentEvents] Future after events details:`, futureAfterEvents.map(e => `${e.date} ${e.event_type} ${e.city_code_before}->${e.city_code_after}`))
-      }
-      
-      // 両方のイベントを結合（消滅イベントと次のバージョンのイベント）
+      // 消滅イベントと次のバージョンのイベントを結合
       const allFutureEvents = [...filteredBeforeEvents, ...futureAfterEvents]
       
-      // 最古の日付を取得（直後のイベントとして最も近い日付を選択）
+      // 最も近い日付のイベントを取得
       const earliestDate = allFutureEvents.length > 0
         ? allFutureEvents.sort((a, b) => a.date.localeCompare(b.date))[0].date
         : null
       
-      // 最古の日付のすべてのイベントを取得（同じ日付で複数の変化がある場合を考慮）
       const afterEventsResult = earliestDate
         ? allFutureEvents.filter(e => e.date === earliestDate)
         : []
-      
-      console.log(`[getAdjacentEvents] After events (${earliestDate}):`, afterEventsResult.length)
       
       return { before: beforeEvents, after: afterEventsResult }
     },
