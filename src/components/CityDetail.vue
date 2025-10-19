@@ -22,51 +22,45 @@
     </div>
 
     <div class="space-y-6">
-      <!-- 直後のイベント（新しいイベント） -->
-      <div v-if="afterEvents.length > 0">
+      <!-- 直前のイベント（古いイベント） -->
+      <div v-if="groupedBeforeEvent">
         <h4 class="text-lg font-semibold text-gray-900 mb-4 flex items-center">
-          <span class="bg-green-100 text-green-800 text-xs font-medium px-2.5 py-0.5 rounded-full mr-3">直後</span>
-          この自治体が変化したイベント
+          <span class="bg-blue-100 text-blue-800 text-xs font-medium px-2.5 py-0.5 rounded-full mr-3">直前</span>
+          この自治体が新設されたイベント
         </h4>
-        <div class="space-y-3">
-          <div
-            v-for="(eventGroup, index) in groupedAfterEvents"
-            :key="'after-' + eventGroup.date + '-' + index"
-            class="bg-green-50 border border-green-200 rounded-lg p-4"
-          >
+        <div class="bg-blue-50 border border-blue-200 rounded-lg p-4">
+          <div class="mb-2">
+            <h5 class="font-semibold text-blue-900">
+              {{ formatDate(groupedBeforeEvent.date) }} 
+              {{ groupedBeforeEvent.event_type }}
+            </h5>
+          </div>
+          <div class="text-sm text-gray-600">
             <div class="mb-2">
-              <h5 class="font-semibold text-green-900">
-                {{ formatDate(eventGroup.date) }} 
-                {{ eventGroup.event_type === '市制施行' || eventGroup.event_type === '町制施行' ? eventGroup.event_type : eventGroup.event_type + '合併' }}
-              </h5>
-            </div>
-            <div class="text-sm text-gray-600">
-              <div class="mb-2">
-                <strong>変化前:</strong>
-                <div class="ml-4 mt-1">
-                  <div
-                    v-for="(beforeCity, idx) in eventGroup.beforeCities"
-                    :key="idx"
-                    class="cursor-pointer text-blue-600 hover:text-blue-800 hover:underline mb-1"
-                    @click="selectCityByCode(eventGroup.beforeCityCodes[idx], isSurvivingCityInGroup(eventGroup.beforeCityCodes[idx], eventGroup.event_type, eventGroup.afterCityCodes) ? eventGroup.date : undefined)"
-                    :title="`${beforeCity}の詳細を表示`"
-                  >
-                    {{ formatBeforeCityWithLabel(eventGroup.beforeCityCodes[idx], eventGroup.event_type, eventGroup.afterCityCodes) }}
-                  </div>
+              <strong>変化前:</strong>
+              <div class="ml-4 mt-1">
+                <div
+                  v-for="(beforeCity, idx) in groupedBeforeEvent.beforeCities"
+                  :key="idx"
+                  class="cursor-pointer text-blue-600 hover:text-blue-800 hover:underline mb-1"
+                  @click="selectCityByCode(groupedBeforeEvent.beforeCityCodes[idx], isSurvivingCityInGroup(groupedBeforeEvent.beforeCityCodes[idx], groupedBeforeEvent.event_type, groupedBeforeEvent.afterCityCodes) ? groupedBeforeEvent.date : undefined)"
+                  :title="`${beforeCity}の詳細を表示`"
+                >
+                  {{ formatBeforeCityWithLabel(groupedBeforeEvent.beforeCityCodes[idx], groupedBeforeEvent.event_type, groupedBeforeEvent.afterCityCodes) }}
                 </div>
               </div>
-              <div>
-                <strong>変化後:</strong>
-                <div class="ml-4 mt-1">
-                  <div
-                    v-for="(afterCity, idx) in eventGroup.afterCities"
-                    :key="idx"
-                    class="cursor-pointer text-blue-600 hover:text-blue-800 hover:underline mb-1"
-                    @click="selectCityByCode(eventGroup.afterCityCodes[idx], eventGroup.event_type === '編入' ? eventGroup.date : undefined)"
-                    :title="`${afterCity}の詳細を表示`"
-                  >
-                    {{ formatAfterCityWithLabel(eventGroup.afterCityCodes[idx], eventGroup.event_type) }}
-                  </div>
+            </div>
+            <div>
+              <strong>変化後:</strong>
+              <div class="ml-4 mt-1">
+                <div
+                  v-for="(afterCity, idx) in groupedBeforeEvent.afterCities"
+                  :key="idx"
+                  class="cursor-pointer text-blue-600 hover:text-blue-800 hover:underline mb-1"
+                  @click="selectCityByCode(groupedBeforeEvent.afterCityCodes[idx], groupedBeforeEvent.event_type === '編入' ? groupedBeforeEvent.date : undefined)"
+                  :title="`${afterCity}の詳細を表示`"
+                >
+                  {{ formatAfterCityWithLabel(groupedBeforeEvent.afterCityCodes[idx], groupedBeforeEvent.event_type) }}
                 </div>
               </div>
             </div>
@@ -74,51 +68,45 @@
         </div>
       </div>
 
-      <!-- 直前のイベント（古いイベント） -->
-      <div v-if="beforeEvents.length > 0">
+      <!-- 直後のイベント（新しいイベント） -->
+      <div v-if="groupedAfterEvent">
         <h4 class="text-lg font-semibold text-gray-900 mb-4 flex items-center">
-          <span class="bg-blue-100 text-blue-800 text-xs font-medium px-2.5 py-0.5 rounded-full mr-3">直前</span>
-          この自治体が新設されたイベント
+          <span class="bg-green-100 text-green-800 text-xs font-medium px-2.5 py-0.5 rounded-full mr-3">直後</span>
+          この自治体が変化したイベント
         </h4>
-        <div class="space-y-3">
-          <div
-            v-for="(eventGroup, index) in groupedBeforeEvents"
-            :key="'before-' + eventGroup.date + '-' + index"
-            class="bg-blue-50 border border-blue-200 rounded-lg p-4"
-          >
+        <div class="bg-green-50 border border-green-200 rounded-lg p-4">
+          <div class="mb-2">
+            <h5 class="font-semibold text-green-900">
+              {{ formatDate(groupedAfterEvent.date) }} 
+              {{ groupedAfterEvent.event_type }}
+            </h5>
+          </div>
+          <div class="text-sm text-gray-600">
             <div class="mb-2">
-              <h5 class="font-semibold text-blue-900">
-                {{ formatDate(eventGroup.date) }} 
-                {{ eventGroup.event_type === '市制施行' || eventGroup.event_type === '町制施行' ? eventGroup.event_type : eventGroup.event_type + '合併' }}
-              </h5>
-            </div>
-            <div class="text-sm text-gray-600">
-              <div class="mb-2">
-                <strong>変化前:</strong>
-                <div class="ml-4 mt-1">
-                  <div
-                    v-for="(beforeCity, idx) in eventGroup.beforeCities"
-                    :key="idx"
-                    class="cursor-pointer text-blue-600 hover:text-blue-800 hover:underline mb-1"
-                    @click="selectCityByCode(eventGroup.beforeCityCodes[idx], isSurvivingCityInGroup(eventGroup.beforeCityCodes[idx], eventGroup.event_type, eventGroup.afterCityCodes) ? eventGroup.date : undefined)"
-                    :title="`${beforeCity}の詳細を表示`"
-                  >
-                    {{ formatBeforeCityWithLabel(eventGroup.beforeCityCodes[idx], eventGroup.event_type, eventGroup.afterCityCodes) }}
-                  </div>
+              <strong>変化前:</strong>
+              <div class="ml-4 mt-1">
+                <div
+                  v-for="(beforeCity, idx) in groupedAfterEvent.beforeCities"
+                  :key="idx"
+                  class="cursor-pointer text-blue-600 hover:text-blue-800 hover:underline mb-1"
+                  @click="selectCityByCode(groupedAfterEvent.beforeCityCodes[idx], isSurvivingCityInGroup(groupedAfterEvent.beforeCityCodes[idx], groupedAfterEvent.event_type, groupedAfterEvent.afterCityCodes) ? groupedAfterEvent.date : undefined)"
+                  :title="`${beforeCity}の詳細を表示`"
+                >
+                  {{ formatBeforeCityWithLabel(groupedAfterEvent.beforeCityCodes[idx], groupedAfterEvent.event_type, groupedAfterEvent.afterCityCodes) }}
                 </div>
               </div>
-              <div>
-                <strong>変化後:</strong>
-                <div class="ml-4 mt-1">
-                  <div
-                    v-for="(afterCity, idx) in eventGroup.afterCities"
-                    :key="idx"
-                    class="cursor-pointer text-blue-600 hover:text-blue-800 hover:underline mb-1"
-                    @click="selectCityByCode(eventGroup.afterCityCodes[idx], eventGroup.event_type === '編入' ? eventGroup.date : undefined)"
-                    :title="`${afterCity}の詳細を表示`"
-                  >
-                    {{ formatAfterCityWithLabel(eventGroup.afterCityCodes[idx], eventGroup.event_type) }}
-                  </div>
+            </div>
+            <div>
+              <strong>変化後:</strong>
+              <div class="ml-4 mt-1">
+                <div
+                  v-for="(afterCity, idx) in groupedAfterEvent.afterCities"
+                  :key="idx"
+                  class="cursor-pointer text-blue-600 hover:text-blue-800 hover:underline mb-1"
+                  @click="selectCityByCode(groupedAfterEvent.afterCityCodes[idx], groupedAfterEvent.event_type === '編入' ? groupedAfterEvent.date : undefined)"
+                  :title="`${afterCity}の詳細を表示`"
+                >
+                  {{ formatAfterCityWithLabel(groupedAfterEvent.afterCityCodes[idx], groupedAfterEvent.event_type) }}
                 </div>
               </div>
             </div>
@@ -127,7 +115,7 @@
       </div>
 
       <!-- イベントがない場合 -->
-      <div v-if="displayEvents.length === 0" class="text-gray-500">
+      <div v-if="!groupedAfterEvent && !groupedBeforeEvent" class="text-gray-500">
         この市区町村には直前・直後の廃置分合イベントがありません。
       </div>
     </div>
@@ -159,33 +147,22 @@ const adjacentEvents = computed(() => {
   return dataStore.getAdjacentEvents(props.selectedCity.code)
 })
 
-// 直前のイベント（この自治体が新設・編入されたイベント）
-const beforeEvents = computed(() => {
-  return adjacentEvents.value.before
+// 直前のイベント（この自治体が新設・編入されたイベント）- 最大1つ
+const beforeEvent = computed(() => {
+  const events = adjacentEvents.value.before
+  return events.length > 0 ? events : []
 })
 
-// 直後のイベント（この自治体が消滅・変化したイベント）
-const afterEvents = computed(() => {
-  return adjacentEvents.value.after
+// 直後のイベント（この自治体が消滅・変化したイベント）- 最大1つ
+const afterEvent = computed(() => {
+  const events = adjacentEvents.value.after
+  return events.length > 0 ? events : []
 })
 
-// 表示するイベントのリスト（直前と直後のイベントを結合）
-const displayEvents = computed(() => {
-  const events: any[] = []
-  
-  // 直前のイベント（すべて）：この自治体が新設・編入されたイベント
-  events.push(...adjacentEvents.value.before)
-  
-  // 直後のイベント（すべて）：この自治体が消滅・変化したイベント
-  events.push(...adjacentEvents.value.after)
-  
-  return events
-})
-
-// イベントをグループ化する共通関数
+// イベントをグループ化する関数（複数のイベントを処理）
 const groupEvents = (events: any[]) => {
   try {
-    if (!events || events.length === 0) return []
+    if (!events || events.length === 0) return null
     
     const groups = new Map<string, any>()
     
@@ -211,7 +188,6 @@ const groupEvents = (events: any[]) => {
       const afterCity = getCityNameByCode(event.city_code_after)
       
       // 編入の場合、存続自治体かどうかを判定（コードのプレフィックスが同じ場合）
-      // 例：18201_20050101 → 18201（同じベースコードなら存続自治体）
       const beforePrefix = event.city_code_before.split('_')[0]
       const afterPrefix = event.city_code_after.split('_')[0]
       const isSurvivingCity = event.event_type === '編入' && beforePrefix === afterPrefix
@@ -234,27 +210,22 @@ const groupEvents = (events: any[]) => {
       }
     }
     
-    // 日付順でソート（新しい日付から古い日付へ）
-    return Array.from(groups.values()).sort((a, b) => b.date.localeCompare(a.date))
+    // 最初のグループを返す（通常は1つのグループのみ）
+    return Array.from(groups.values())[0] || null
   } catch (error) {
     console.error('Error in groupEvents:', error)
-    return []
+    return null
   }
 }
 
 // 直前のイベントをグループ化
-const groupedBeforeEvents = computed(() => {
-  return groupEvents(beforeEvents.value)
+const groupedBeforeEvent = computed(() => {
+  return groupEvents(beforeEvent.value)
 })
 
 // 直後のイベントをグループ化
-const groupedAfterEvents = computed(() => {
-  return groupEvents(afterEvents.value)
-})
-
-// 同日のイベントをグループ化（同じ日付・同じイベントタイプ・同じ変化後の自治体でグループ化）
-const groupedEvents = computed(() => {
-  return groupEvents(displayEvents.value)
+const groupedAfterEvent = computed(() => {
+  return groupEvents(afterEvent.value)
 })
 
 // 市区町村コードから市区町村を選択
