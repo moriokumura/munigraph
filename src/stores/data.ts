@@ -71,7 +71,7 @@ export const useDataStore = defineStore('data', {
       console.log('Starting data load...')
       
       try {
-        const base = '/data'
+        const base = import.meta.env.BASE_URL + 'data'
         console.log('Loading data from:', base)
         const [prefsRaw, countiesRaw, citiesRaw, changesRaw] = await Promise.all([
           fetchCsv(`${base}/prefectures.csv`),
