@@ -198,15 +198,16 @@ const availableCounties = computed(() => {
   return dataStore.counties.filter(county => county.prefecture_code === selectedPrefecture.value)
 })
 
-// 検索結果を計算
+// 検索結果を計算（検索クエリとフィルター条件を組み合わせて適用）
 const filteredCities = computed(() => {
   if (!dataStore.loaded) return []
   
-  // まず検索クエリで絞り込み
+  // まず検索クエリで絞り込み（市区町村名、読み仮名、都道府県名、郡名で検索）
   let cities = dataStore.searchCities(searchQuery.value)
   
-  // フィルター適用
+  // フィルター適用（現存/消滅、都道府県、郡での絞り込み）
   cities = cities.filter(city => {
+    // 現存/消滅フィルター：valid_toが空の場合は現存自治体
     const isExisting = !city.valid_to || city.valid_to.trim() === ''
     if (isExisting && !showExisting.value) return false
     if (!isExisting && !showExtinct.value) return false
@@ -214,7 +215,7 @@ const filteredCities = computed(() => {
     // 都道府県フィルター
     if (selectedPrefecture.value && city.prefecture_code !== selectedPrefecture.value) return false
     
-    // 郡フィルター（都道府県が選択されている場合のみ）
+    // 郡フィルター（都道府県が選択されている場合のみ適用）
     if (selectedCounty.value && city.county_code !== selectedCounty.value) return false
     
     return true
@@ -243,20 +244,20 @@ const adjacentEvents = computed(() => {
   return dataStore.getAdjacentEvents(selectedCity.value.code)
 })
 
-// 表示するイベントのリスト
+// 表示するイベントのリスト（直前と直後のイベントを結合）
 const displayEvents = computed(() => {
   const events: any[] = []
   
-  // 直前のイベント（すべて）
+  // 直前のイベント（すべて）：この自治体が新設・編入されたイベント
   events.push(...adjacentEvents.value.before)
   
-  // 直後のイベント（すべて）
+  // 直後のイベント（すべて）：この自治体が消滅・変化したイベント
   events.push(...adjacentEvents.value.after)
   
   return events
 })
 
-// 同日のイベントをグループ化
+// 同日のイベントをグループ化（同じ日付・同じイベントタイプ・同じ変化後の自治体でグループ化）
 const groupedEvents = computed(() => {
   try {
     const eventsList = displayEvents.value
@@ -267,6 +268,7 @@ const groupedEvents = computed(() => {
     for (const event of eventsList) {
       if (!event || !event.date || !event.event_type) continue
       
+      // グループ化のキー：日付-イベントタイプ-変化後の自治体コード
       const key = `${event.date}-${event.event_type}-${event.city_code_after}`
       
       if (!groups.has(key)) {
@@ -285,16 +287,17 @@ const groupedEvents = computed(() => {
       const afterCity = getCityNameByCode(event.city_code_after)
       
       // 編入の場合、存続自治体かどうかを判定（コードのプレフィックスが同じ場合）
+      // 例：18201_20050101 → 18201（同じベースコードなら存続自治体）
       const beforePrefix = event.city_code_before.split('_')[0]
       const afterPrefix = event.city_code_after.split('_')[0]
       const isSurvivingCity = event.event_type === '編入' && beforePrefix === afterPrefix
       
-      // 編入の場合で存続自治体の場合、変化前の先頭に追加
+      // 編入の場合で存続自治体の場合、変化前の先頭に追加（存続自治体を最初に表示）
       if (isSurvivingCity && beforeCity && !group.beforeCityCodes.includes(event.city_code_before)) {
         group.beforeCities.unshift(beforeCity)
         group.beforeCityCodes.unshift(event.city_code_before)
       }
-      // それ以外の変化前の自治体を追加
+      // それ以外の変化前の自治体を追加（消滅自治体）
       else if (beforeCity && !group.beforeCityCodes.includes(event.city_code_before)) {
         group.beforeCities.push(beforeCity)
         group.beforeCityCodes.push(event.city_code_before)
@@ -307,7 +310,7 @@ const groupedEvents = computed(() => {
       }
     }
     
-    // 日付順でソート
+    // 日付順でソート（新しい日付から古い日付へ）
     return Array.from(groups.values()).sort((a, b) => b.date.localeCompare(a.date))
   } catch (error) {
     console.error('Error in groupedEvents:', error)
@@ -368,13 +371,14 @@ const formatCityWithYomiAndPeriod = (city: City) => {
   const cityInfo = getCityInfo(city)
   let baseDisplay = ''
   
+  // 読み仮名がある場合は含めて表示
   if (city.yomi && city.yomi.trim() !== '') {
     baseDisplay = `${city.name} (${city.yomi} ${cityInfo} ${city.code}`
   } else {
     baseDisplay = `${city.name} (${cityInfo} ${city.code}`
   }
   
-  // 存続期間の開始日を取得
+  // 存続期間の開始日を取得（YYYY-MM-DD形式から日本語形式に変換）
   let validFromStr = ''
   if (city.valid_from && city.valid_from.trim() !== '') {
     const validFromDate = new Date(city.valid_from)
@@ -385,7 +389,7 @@ const formatCityWithYomiAndPeriod = (city: City) => {
     }).replace(/\//g, '/')
   }
   
-  // 存続期間を追加
+  // 存続期間を追加（現存/消滅の区別を明確に表示）
   if (city.valid_to && city.valid_to.trim() !== '') {
     // 消滅自治体の場合：開始日〜廃止日を表示
     const validToDate = new Date(city.valid_to)
@@ -403,14 +407,14 @@ const formatCityWithYomiAndPeriod = (city: City) => {
   }
 }
 
-// 存続自治体かどうかを判定
+// 存続自治体かどうかを判定（編入イベントで、変化前と変化後のコードプレフィックスが同じ場合）
 const isSurvivingCityInGroup = (beforeCode: string, eventType: string, afterCodes: string[]) => {
   if (eventType !== '編入') return false
   const beforePrefix = beforeCode.split('_')[0]
   return afterCodes.some(afterCode => afterCode.split('_')[0] === beforePrefix)
 }
 
-// 変化前の自治体にラベルを付けて表示
+// 変化前の自治体にラベルを付けて表示（存続/消滅の区別を明確にする）
 const formatBeforeCityWithLabel = (code: string, eventType: string, afterCityCodes: string[]) => {
   const cityDisplay = formatCityWithYomi(code)
   
@@ -422,7 +426,7 @@ const formatBeforeCityWithLabel = (code: string, eventType: string, afterCityCod
   return `[消滅] ${cityDisplay}`
 }
 
-// 変化後の自治体にラベルを付けて表示
+// 変化後の自治体にラベルを付けて表示（イベントタイプに応じてラベルを追加）
 const formatAfterCityWithLabel = (code: string, eventType: string) => {
   const cityDisplay = formatCityWithYomi(code)
   if (eventType === '新設') {

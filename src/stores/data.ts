@@ -113,6 +113,7 @@ export const useDataStore = defineStore('data', {
         throw error
       }
     },
+
     // データストアをリセット
     reset() {
       this.loaded = false
@@ -128,6 +129,7 @@ export const useDataStore = defineStore('data', {
       this.prefByCode = new Map()
       this.countyByCode = new Map()
     },
+
     // 現存の市区町村を取得
     getCurrentCities() {
       const currentCities = this.cities.filter(city => 
@@ -137,6 +139,7 @@ export const useDataStore = defineStore('data', {
       console.log('Current cities count:', currentCities.length, 'out of total:', this.cities.length)
       return currentCities
     },
+
     // 検索機能（現存・消滅両方を含む）
     searchCities(query: string) {
       if (!query.trim()) {
@@ -162,6 +165,7 @@ export const useDataStore = defineStore('data', {
                countyYomi.includes(lowerQuery)
       })
     },
+
     // 市制施行・町制施行のような変更を検出
     getMunicipalStatusChanges(cityCode: string): Change[] {
       const events: Change[] = []
@@ -217,7 +221,7 @@ export const useDataStore = defineStore('data', {
       const afterEvents = this.eventsByAfter.get(cityCode)
       console.log(`After events for ${cityCode}:`, afterEvents?.length || 0)
       
-      // 市制施行・町制施行の可能性もチェック
+      // 市制施行・町制施行の可能性もチェック（町→市、村→町の変化）
       const statusChanges = this.getMunicipalStatusChanges(cityCode)
       console.log(`Status changes for ${cityCode}:`, statusChanges.length)
       
@@ -234,7 +238,7 @@ export const useDataStore = defineStore('data', {
       }
       
       if (afterEvents && afterEvents.length > 0) {
-        // 同じ日付のイベントをグループ化
+        // 同じ日付のイベントをグループ化（合併などで複数の自治体が同時に変化する場合がある）
         const eventsByDate = new Map<string, Change[]>()
         for (const event of afterEvents) {
           if (!eventsByDate.has(event.date)) {
@@ -243,7 +247,7 @@ export const useDataStore = defineStore('data', {
           eventsByDate.get(event.date)!.push(event)
         }
         
-        // 日付順にソートして処理
+        // 日付順にソートして処理（新しい日付から古い日付へ）
         const sortedDates = Array.from(eventsByDate.keys()).sort((a, b) => b.localeCompare(a))
         
         for (const date of sortedDates) {
@@ -265,7 +269,7 @@ export const useDataStore = defineStore('data', {
             }
           }
           
-          // 最初の日付のイベントのみ処理して終了
+          // 最初の日付のイベントのみ処理して終了（直近の変化のみを対象とする）
           break
         }
       }
@@ -287,13 +291,15 @@ export const useDataStore = defineStore('data', {
       if (!beforeEvents || beforeEvents.length === 0) return events
       
       // 時期別コードの場合、コードのサフィックス（日付部分）を取得
+      // 例: "18201_20050101" → "20050101"
       const codeParts = cityCode.split('_')
       const codeDate = codeParts.length > 1 ? codeParts[1] : null
       
-      // コードの日付より前のイベントのみをフィルタリング
+      // コードの日付より前のイベントのみをフィルタリング（時系列の整合性を保つため）
       let filteredEvents = beforeEvents
       if (codeDate && codeDate !== 'initial') {
         // コードの日付をYYYY-MM-DD形式に変換
+        // 例: "20050101" → "2005-01-01"
         const year = codeDate.substring(0, 4)
         const month = codeDate.substring(4, 6)
         const day = codeDate.substring(6, 8)
@@ -379,12 +385,13 @@ export const useDataStore = defineStore('data', {
       // 1. この市区町村が変化前となったイベント（この市区町村が消滅したイベント）
       const beforeEventsAll = this.eventsByBefore.get(cityCode) || []
       
-      // 時期別コードの場合、コードの日付より後のイベントのみを取得
+      // 時期別コードの場合、コードの日付より後のイベントのみを取得（時系列の整合性を保つため）
       const codeParts = cityCode.split('_')
       const codeDate = codeParts.length > 1 ? codeParts[1] : null
       
       let filteredBeforeEvents = beforeEventsAll
       if (codeDate && codeDate !== 'initial') {
+        // コードの日付をYYYY-MM-DD形式に変換して比較
         const year = codeDate.substring(0, 4)
         const month = codeDate.substring(4, 6)
         const day = codeDate.substring(6, 8)
@@ -422,10 +429,11 @@ export const useDataStore = defineStore('data', {
         console.log(`[getAdjacentEvents] Sample keys:`, allKeys.slice(0, 20))
         
         // この市区町村のより新しいバージョンを動的に探す
+        // 同じベースコード（例：18201）でより新しい日付のイベントを検索
         for (const [eventCode, event] of this.eventsByAfter.entries()) {
           if (eventCode.startsWith(baseCode + '_') && event.date > codeDateStr) {
             console.log(`[getAdjacentEvents] Found newer event:`, `${event.date} ${event.event_type} ${event.city_code_before}->${event.city_code_after}`)
-            // 同じ日付のすべてのイベントを取得
+            // 同じ日付のすべてのイベントを取得（合併などで複数の自治体が同時に変化する場合）
             const sameDateEvents = Array.from(this.eventsByAfter.values())
               .filter((e: Change) => e.date === event.date && e.city_code_after === event.city_code_after) as Change[]
             futureAfterEvents.push(...sameDateEvents)
@@ -442,15 +450,15 @@ export const useDataStore = defineStore('data', {
         console.log(`[getAdjacentEvents] Future after events details:`, futureAfterEvents.map(e => `${e.date} ${e.event_type} ${e.city_code_before}->${e.city_code_after}`))
       }
       
-      // 両方のイベントを結合
+      // 両方のイベントを結合（消滅イベントと次のバージョンのイベント）
       const allFutureEvents = [...filteredBeforeEvents, ...futureAfterEvents]
       
-      // 最古の日付を取得
+      // 最古の日付を取得（直後のイベントとして最も近い日付を選択）
       const earliestDate = allFutureEvents.length > 0
         ? allFutureEvents.sort((a, b) => a.date.localeCompare(b.date))[0].date
         : null
       
-      // 最古の日付のすべてのイベントを取得
+      // 最古の日付のすべてのイベントを取得（同じ日付で複数の変化がある場合を考慮）
       const afterEventsResult = earliestDate
         ? allFutureEvents.filter(e => e.date === earliestDate)
         : []
