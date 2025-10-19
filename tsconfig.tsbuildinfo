@@ -1,0 +1,1 @@
+{"root":["./src/app.vue","./src/main.ts","./src/components/helloworld.vue","./src/pages/browse.vue","./src/pages/home.vue","./src/pages/quiz.vue","./src/router/index.ts","./src/stores/data.ts"],"version":"5.9.3"}
