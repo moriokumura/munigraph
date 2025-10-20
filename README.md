@@ -88,7 +88,7 @@ npm run preview
 - wikipediaへのリンクがほしい
 - ノード表示に変え、選択中の自治体が二重表示にならないようにしたい
 - 郡名の読み表示
-- prettier,eslint,tailwind4
+- prettier,eslint
 
 #### 元データ不足
 - 不足データ収集方針を検討

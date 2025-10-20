@@ -252,11 +252,22 @@ const getCityNameByCode = (code: string) => {
   return city ? `${city.name} (${cityInfo})` : `不明な市区町村 (${code})`
 }
 
-// 市区町村情報を取得
+// 市区町村情報を取得（郡名に読み仮名を含める）
 const getCityInfo = (city: City) => {
   const pref = dataStore.prefByCode.get(city.prefecture_code)
   const county = dataStore.countyByCode.get(city.county_code)
-  const parts = [pref?.name, county?.name].filter(Boolean)
+  
+  const parts: string[] = []
+  if (pref?.name) parts.push(pref.name)
+  if (county?.name) {
+    // 郡名に読み仮名がある場合は追加
+    if (county.yomi && county.yomi.trim() !== '') {
+      parts.push(`${county.name} (${county.yomi})`)
+    } else {
+      parts.push(county.name)
+    }
+  }
+  
   return parts.join(' ')
 }
 
