@@ -2,9 +2,25 @@
   <div v-if="selectedCity" class="mt-8 border-t pt-6">
     <!-- 選択中の自治体名表示 -->
     <div class="mb-6">
-      <h3 class="text-2xl font-bold text-gray-900 mb-2">
-        {{ selectedCity.name }}
-      </h3>
+      <div class="flex items-center gap-3 mb-2">
+        <h3 class="text-2xl font-bold text-gray-900">
+          {{ selectedCity.name }}
+        </h3>
+        <a
+          :href="getWikipediaUrl(selectedCity)"
+          target="_blank"
+          rel="noopener noreferrer"
+          class="inline-flex items-center gap-1 px-3 py-1 text-sm font-medium text-blue-600 hover:text-blue-800 hover:bg-blue-50 rounded-lg transition-colors"
+          title="Wikipediaで開く"
+        >
+          <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 24 24">
+            <path
+              d="M12.87 15.07l-2.54-2.51.03-.03c1.74-1.94 2.98-4.17 3.71-6.53H17V4h-7V2H8v2H1v1.99h11.17C11.5 7.92 10.44 9.75 9 11.35 8.07 10.32 7.3 9.19 6.69 8h-2c.73 1.63 1.73 3.17 2.98 4.56l-5.09 5.02L4 19l5-5 3.11 3.11.76-2.04zM18.5 10h-2L12 22h2l1.12-3h4.75L21 22h2l-4.5-12zm-2.62 7l1.62-4.33L19.12 17h-3.24z"
+            />
+          </svg>
+          Wikipedia
+        </a>
+      </div>
       <div class="text-sm text-gray-600 space-y-1">
         <div v-if="selectedCity.yomi && selectedCity.yomi.trim() !== ''">
           <span class="font-medium">読み方:</span> {{ selectedCity.yomi }}
@@ -412,5 +428,17 @@ const formatDate = (dateStr: string) => {
     month: 'long',
     day: 'numeric',
   })
+}
+
+// WikipediaのURLを生成
+const getWikipediaUrl = (city: City) => {
+  // 市区町村名から不要な文字を除去（コード部分など）
+  const cityName = city.name.trim()
+  
+  // Wikipedia日本語版のURL
+  // 例: https://ja.wikipedia.org/wiki/弓削町
+  // シンプルに市区町村名のみで検索
+  // 曖昧さ回避ページや検索結果に遷移する可能性があるが、それでOK
+  return `https://ja.wikipedia.org/wiki/${encodeURIComponent(cityName)}`
 }
 </script>
