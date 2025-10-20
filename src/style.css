@@ -1,5 +1,1 @@
-@tailwind base;
-@tailwind components;
-@tailwind utilities;
-
-/* Tailwind CSSのベーススタイルが適用されるため、カスタムスタイルは最小限に */
+@import "tailwindcss";

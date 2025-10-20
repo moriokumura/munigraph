@@ -1,8 +1,14 @@
 import { defineConfig } from 'vite';
 import vue from '@vitejs/plugin-vue';
 import path from 'node:path';
+import tailwindcss from '@tailwindcss/postcss';
 export default defineConfig({
     plugins: [vue()],
+    css: {
+        postcss: {
+            plugins: [tailwindcss],
+        },
+    },
     base: '/munigraph/', // GitHub Pages用のベースパス
     resolve: { alias: { '@': path.resolve(__dirname, 'src') } },
     server: {
