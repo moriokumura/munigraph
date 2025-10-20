@@ -48,7 +48,8 @@
 
 <script setup lang="ts">
 import { ref, onMounted } from 'vue'
-import { useDataStore, type City } from '@/stores/data'
+import { useDataStore } from '@/stores/data'
+import type { City } from '@/types/municipality'
 import CitySearch from '@/components/CitySearch.vue'
 import CityList from '@/components/CityList.vue'
 import CityDetail from '@/components/CityDetail.vue'

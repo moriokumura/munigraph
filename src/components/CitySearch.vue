@@ -145,7 +145,8 @@
 
 <script setup lang="ts">
 import { ref, computed, watch } from 'vue'
-import { useDataStore, type City } from '@/stores/data'
+import { useDataStore } from '@/stores/data'
+import type { City } from '@/types/municipality'
 
 // Props定義
 interface Props {

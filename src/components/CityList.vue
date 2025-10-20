@@ -36,7 +36,8 @@
 </template>
 
 <script setup lang="ts">
-import { useDataStore, type City } from '@/stores/data'
+import { useDataStore } from '@/stores/data'
+import type { City } from '@/types/municipality'
 
 // Props定義
 interface Props {
