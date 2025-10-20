@@ -16,7 +16,7 @@
     <div v-else class="flex flex-col min-h-[calc(100vh-80px)]">
       <!-- 絞り込みフォーム（全画面サイズで表示） -->
       <div class="w-full">
-        <CitySearch 
+        <CitySearch
           :selected-city="selectedCity"
           @city-selected="handleCitySelected"
           @filtered-cities-changed="handleFilteredCitiesChanged"
@@ -26,7 +26,7 @@
       <!-- コンテンツエリア -->
       <div class="flex-1 flex flex-col lg:flex-row min-h-0">
         <!-- 市区町村一覧 -->
-        <CityList 
+        <CityList
           :cities="filteredCities"
           :selected-city="selectedCity"
           @city-selected="handleCitySelected"
@@ -35,10 +35,7 @@
         <!-- 自治体詳細 -->
         <div class="flex-1 lg:w-1/2 bg-white overflow-y-auto">
           <div class="p-4">
-            <CityDetail 
-              :selected-city="selectedCity"
-              @city-selected="handleCitySelected"
-            />
+            <CityDetail :selected-city="selectedCity" @city-selected="handleCitySelected" />
           </div>
         </div>
       </div>

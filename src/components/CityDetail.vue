@@ -9,15 +9,9 @@
         <div v-if="selectedCity.yomi && selectedCity.yomi.trim() !== ''">
           <span class="font-medium">読み方:</span> {{ selectedCity.yomi }}
         </div>
-        <div>
-          <span class="font-medium">コード:</span> {{ selectedCity.code }}
-        </div>
-        <div>
-          <span class="font-medium">所在地:</span> {{ getCityInfo(selectedCity) }}
-        </div>
-        <div>
-          <span class="font-medium">存続期間:</span> {{ getValidityPeriod(selectedCity) }}
-        </div>
+        <div><span class="font-medium">コード:</span> {{ selectedCity.code }}</div>
+        <div><span class="font-medium">所在地:</span> {{ getCityInfo(selectedCity) }}</div>
+        <div><span class="font-medium">存続期間:</span> {{ getValidityPeriod(selectedCity) }}</div>
       </div>
     </div>
 
@@ -25,13 +19,16 @@
       <!-- 直前のイベント（古いイベント） -->
       <div v-if="groupedBeforeEvent">
         <h4 class="text-lg font-semibold text-gray-900 mb-4 flex items-center">
-          <span class="bg-blue-100 text-blue-800 text-xs font-medium px-2.5 py-0.5 rounded-full mr-3">直前</span>
+          <span
+            class="bg-blue-100 text-blue-800 text-xs font-medium px-2.5 py-0.5 rounded-full mr-3"
+            >直前</span
+          >
           この自治体が新設されたイベント
         </h4>
         <div class="bg-blue-50 border border-blue-200 rounded-lg p-4">
           <div class="mb-2">
             <h5 class="font-semibold text-blue-900">
-              {{ formatDate(groupedBeforeEvent.date) }} 
+              {{ formatDate(groupedBeforeEvent.date) }}
               {{ groupedBeforeEvent.event_type }}
             </h5>
           </div>
@@ -43,10 +40,27 @@
                   v-for="(beforeCity, idx) in groupedBeforeEvent.beforeCities"
                   :key="idx"
                   class="cursor-pointer text-blue-600 hover:text-blue-800 hover:underline mb-1"
-                  @click="selectCityByCode(groupedBeforeEvent.beforeCityCodes[idx], isSurvivingCityInGroup(groupedBeforeEvent.beforeCityCodes[idx], groupedBeforeEvent.event_type, groupedBeforeEvent.afterCityCodes) ? groupedBeforeEvent.date : undefined)"
                   :title="`${beforeCity}の詳細を表示`"
+                  @click="
+                    selectCityByCode(
+                      groupedBeforeEvent.beforeCityCodes[idx],
+                      isSurvivingCityInGroup(
+                        groupedBeforeEvent.beforeCityCodes[idx],
+                        groupedBeforeEvent.event_type,
+                        groupedBeforeEvent.afterCityCodes
+                      )
+                        ? groupedBeforeEvent.date
+                        : undefined
+                    )
+                  "
                 >
-                  {{ formatBeforeCityWithLabel(groupedBeforeEvent.beforeCityCodes[idx], groupedBeforeEvent.event_type, groupedBeforeEvent.afterCityCodes) }}
+                  {{
+                    formatBeforeCityWithLabel(
+                      groupedBeforeEvent.beforeCityCodes[idx],
+                      groupedBeforeEvent.event_type,
+                      groupedBeforeEvent.afterCityCodes
+                    )
+                  }}
                 </div>
               </div>
             </div>
@@ -57,10 +71,20 @@
                   v-for="(afterCity, idx) in groupedBeforeEvent.afterCities"
                   :key="idx"
                   class="cursor-pointer text-blue-600 hover:text-blue-800 hover:underline mb-1"
-                  @click="selectCityByCode(groupedBeforeEvent.afterCityCodes[idx], groupedBeforeEvent.event_type === '編入' ? groupedBeforeEvent.date : undefined)"
                   :title="`${afterCity}の詳細を表示`"
+                  @click="
+                    selectCityByCode(
+                      groupedBeforeEvent.afterCityCodes[idx],
+                      groupedBeforeEvent.event_type === '編入' ? groupedBeforeEvent.date : undefined
+                    )
+                  "
                 >
-                  {{ formatAfterCityWithLabel(groupedBeforeEvent.afterCityCodes[idx], groupedBeforeEvent.event_type) }}
+                  {{
+                    formatAfterCityWithLabel(
+                      groupedBeforeEvent.afterCityCodes[idx],
+                      groupedBeforeEvent.event_type
+                    )
+                  }}
                 </div>
               </div>
             </div>
@@ -71,13 +95,16 @@
       <!-- 直後のイベント（新しいイベント） -->
       <div v-if="groupedAfterEvent">
         <h4 class="text-lg font-semibold text-gray-900 mb-4 flex items-center">
-          <span class="bg-green-100 text-green-800 text-xs font-medium px-2.5 py-0.5 rounded-full mr-3">直後</span>
+          <span
+            class="bg-green-100 text-green-800 text-xs font-medium px-2.5 py-0.5 rounded-full mr-3"
+            >直後</span
+          >
           この自治体が変化したイベント
         </h4>
         <div class="bg-green-50 border border-green-200 rounded-lg p-4">
           <div class="mb-2">
             <h5 class="font-semibold text-green-900">
-              {{ formatDate(groupedAfterEvent.date) }} 
+              {{ formatDate(groupedAfterEvent.date) }}
               {{ groupedAfterEvent.event_type }}
             </h5>
           </div>
@@ -89,10 +116,27 @@
                   v-for="(beforeCity, idx) in groupedAfterEvent.beforeCities"
                   :key="idx"
                   class="cursor-pointer text-blue-600 hover:text-blue-800 hover:underline mb-1"
-                  @click="selectCityByCode(groupedAfterEvent.beforeCityCodes[idx], isSurvivingCityInGroup(groupedAfterEvent.beforeCityCodes[idx], groupedAfterEvent.event_type, groupedAfterEvent.afterCityCodes) ? groupedAfterEvent.date : undefined)"
                   :title="`${beforeCity}の詳細を表示`"
+                  @click="
+                    selectCityByCode(
+                      groupedAfterEvent.beforeCityCodes[idx],
+                      isSurvivingCityInGroup(
+                        groupedAfterEvent.beforeCityCodes[idx],
+                        groupedAfterEvent.event_type,
+                        groupedAfterEvent.afterCityCodes
+                      )
+                        ? groupedAfterEvent.date
+                        : undefined
+                    )
+                  "
                 >
-                  {{ formatBeforeCityWithLabel(groupedAfterEvent.beforeCityCodes[idx], groupedAfterEvent.event_type, groupedAfterEvent.afterCityCodes) }}
+                  {{
+                    formatBeforeCityWithLabel(
+                      groupedAfterEvent.beforeCityCodes[idx],
+                      groupedAfterEvent.event_type,
+                      groupedAfterEvent.afterCityCodes
+                    )
+                  }}
                 </div>
               </div>
             </div>
@@ -103,10 +147,20 @@
                   v-for="(afterCity, idx) in groupedAfterEvent.afterCities"
                   :key="idx"
                   class="cursor-pointer text-blue-600 hover:text-blue-800 hover:underline mb-1"
-                  @click="selectCityByCode(groupedAfterEvent.afterCityCodes[idx], groupedAfterEvent.event_type === '編入' ? groupedAfterEvent.date : undefined)"
                   :title="`${afterCity}の詳細を表示`"
+                  @click="
+                    selectCityByCode(
+                      groupedAfterEvent.afterCityCodes[idx],
+                      groupedAfterEvent.event_type === '編入' ? groupedAfterEvent.date : undefined
+                    )
+                  "
                 >
-                  {{ formatAfterCityWithLabel(groupedAfterEvent.afterCityCodes[idx], groupedAfterEvent.event_type) }}
+                  {{
+                    formatAfterCityWithLabel(
+                      groupedAfterEvent.afterCityCodes[idx],
+                      groupedAfterEvent.event_type
+                    )
+                  }}
                 </div>
               </div>
             </div>
@@ -164,15 +218,15 @@ const afterEvent = computed(() => {
 const groupEvents = (events: any[]) => {
   try {
     if (!events || events.length === 0) return null
-    
+
     const groups = new Map<string, any>()
-    
+
     for (const event of events) {
       if (!event || !event.date || !event.event_type) continue
-      
+
       // グループ化のキー：日付-イベントタイプ-変化後の自治体コード
       const key = `${event.date}-${event.event_type}-${event.city_code_after}`
-      
+
       if (!groups.has(key)) {
         groups.set(key, {
           date: event.date,
@@ -180,21 +234,25 @@ const groupEvents = (events: any[]) => {
           beforeCities: [],
           afterCities: [],
           beforeCityCodes: [],
-          afterCityCodes: []
+          afterCityCodes: [],
         })
       }
-      
+
       const group = groups.get(key)!
       const beforeCity = getCityNameByCode(event.city_code_before)
       const afterCity = getCityNameByCode(event.city_code_after)
-      
+
       // 編入の場合、存続自治体かどうかを判定（コードのプレフィックスが同じ場合）
       const beforePrefix = event.city_code_before.split('_')[0]
       const afterPrefix = event.city_code_after.split('_')[0]
       const isSurvivingCity = event.event_type === '編入' && beforePrefix === afterPrefix
-      
+
       // 編入の場合で存続自治体の場合、変化前の先頭に追加（存続自治体を最初に表示）
-      if (isSurvivingCity && beforeCity && !group.beforeCityCodes.includes(event.city_code_before)) {
+      if (
+        isSurvivingCity &&
+        beforeCity &&
+        !group.beforeCityCodes.includes(event.city_code_before)
+      ) {
         group.beforeCities.unshift(beforeCity)
         group.beforeCityCodes.unshift(event.city_code_before)
       }
@@ -203,14 +261,14 @@ const groupEvents = (events: any[]) => {
         group.beforeCities.push(beforeCity)
         group.beforeCityCodes.push(event.city_code_before)
       }
-      
+
       // 変化後の自治体を追加
       if (afterCity && !group.afterCityCodes.includes(event.city_code_after)) {
         group.afterCities.push(afterCity)
         group.afterCityCodes.push(event.city_code_after)
       }
     }
-    
+
     // 最初のグループを返す（通常は1つのグループのみ）
     return Array.from(groups.values())[0] || null
   } catch (error) {
@@ -234,7 +292,7 @@ const selectCityByCode = (cityCode: string, fromEventDate?: string) => {
   const city = dataStore.cityByCode.get(cityCode)
   if (city) {
     emit('citySelected', city)
-    
+
     // スクロールして選択された市区町村の詳細を表示
     setTimeout(() => {
       const element = document.querySelector('.mt-8.border-t.pt-6')
@@ -256,7 +314,7 @@ const getCityNameByCode = (code: string) => {
 const getCityInfo = (city: City) => {
   const pref = dataStore.prefByCode.get(city.prefecture_code)
   const county = dataStore.countyByCode.get(city.county_code)
-  
+
   const parts: string[] = []
   if (pref?.name) parts.push(pref.name)
   if (county?.name) {
@@ -267,7 +325,7 @@ const getCityInfo = (city: City) => {
       parts.push(county.name)
     }
   }
-  
+
   return parts.join(' ')
 }
 
@@ -275,7 +333,7 @@ const getCityInfo = (city: City) => {
 const formatCityWithYomi = (code: string) => {
   const city = dataStore.cityByCode.get(code)
   if (!city) return `不明な市区町村 (${code})`
-  
+
   const cityInfo = getCityInfo(city)
   if (city.yomi && city.yomi.trim() !== '') {
     return `${city.name} (${city.yomi} ${cityInfo} ${code})`
@@ -294,12 +352,12 @@ const isSurvivingCityInGroup = (beforeCode: string, eventType: string, afterCode
 // 変化前の自治体にラベルを付けて表示（存続/消滅の区別を明確にする）
 const formatBeforeCityWithLabel = (code: string, eventType: string, afterCityCodes: string[]) => {
   const cityDisplay = formatCityWithYomi(code)
-  
+
   // 編入の場合、コードのプレフィックスを比較して存続自治体かどうかを判定
   if (isSurvivingCityInGroup(code, eventType, afterCityCodes)) {
     return `[存続] ${cityDisplay}`
   }
-  
+
   return `[消滅] ${cityDisplay}`
 }
 
@@ -320,21 +378,25 @@ const getValidityPeriod = (city: City) => {
   let validFromStr = ''
   if (city.valid_from && city.valid_from.trim() !== '') {
     const validFromDate = new Date(city.valid_from)
-    validFromStr = validFromDate.toLocaleDateString('ja-JP', {
-      year: 'numeric',
-      month: '2-digit',
-      day: '2-digit'
-    }).replace(/\//g, '/')
+    validFromStr = validFromDate
+      .toLocaleDateString('ja-JP', {
+        year: 'numeric',
+        month: '2-digit',
+        day: '2-digit',
+      })
+      .replace(/\//g, '/')
   }
-  
+
   if (city.valid_to && city.valid_to.trim() !== '') {
     // 消滅自治体の場合：開始日〜廃止日を表示
     const validToDate = new Date(city.valid_to)
-    const validToStr = validToDate.toLocaleDateString('ja-JP', {
-      year: 'numeric',
-      month: '2-digit',
-      day: '2-digit'
-    }).replace(/\//g, '/')
+    const validToStr = validToDate
+      .toLocaleDateString('ja-JP', {
+        year: 'numeric',
+        month: '2-digit',
+        day: '2-digit',
+      })
+      .replace(/\//g, '/')
     return validFromStr ? `${validFromStr}〜${validToStr}` : `〜${validToStr}`
   } else {
     // 現存自治体の場合：開始日〜現存
@@ -348,7 +410,7 @@ const formatDate = (dateStr: string) => {
   return date.toLocaleDateString('ja-JP', {
     year: 'numeric',
     month: 'long',
-    day: 'numeric'
+    day: 'numeric',
   })
 }
 </script>

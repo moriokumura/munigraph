@@ -9,7 +9,7 @@ onMounted(() => {
   console.log('App component mounted, store state:', {
     loaded: store.loaded,
     loading: store.loading,
-    error: store.error
+    error: store.error,
   })
 })
 </script>
