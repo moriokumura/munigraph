@@ -28,8 +28,12 @@
           >
             <div class="flex justify-between items-center">
               <div class="flex-1">
-                <h4 class="font-semibold text-lg">
-                  {{ formatCityWithYomiAndPeriod(city) }}
+                <h4 class="text-lg">
+                  <span v-if="getCityDisplayParts(city).pref" class="mr-1">{{ getCityDisplayParts(city).pref }}</span>
+                  <span v-if="getCityDisplayParts(city).county" class="mr-1">{{ getCityDisplayParts(city).county }}</span>
+                  <span class="font-bold mr-1">{{ getCityDisplayParts(city).name }}</span>
+                  <span v-if="getCityDisplayParts(city).yomi"> ({{ getCityDisplayParts(city).yomi }})</span>
+                  <span v-if="getCityDisplayParts(city).period" class="ml-1 px-1.5 py-0.5 bg-gray-100 rounded text-sm">{{ getCityDisplayParts(city).period }}</span>
                 </h4>
               </div>
             </div>
@@ -65,7 +69,7 @@ const selectCity = (city: City) => {
   emit('citySelected', city)
 }
 
-// 市区町村情報を取得（都道府県名と郡名のみ、振興局/支庁は除外）
+// 市区町村情報を取得（都道府県名と郡名のみ、支庁は除外）
 const getCityInfo = (city: City) => {
   const pref = dataStore.prefByCode.get(city.prefecture_code)
   const county = dataStore.countyByCode.get(city.county_code)
@@ -73,48 +77,41 @@ const getCityInfo = (city: City) => {
   return parts.join(' ')
 }
 
-// 一覧表示用：市区町村名と読み方、存続期間を組み合わせて表示
-const formatCityWithYomiAndPeriod = (city: City) => {
-  const cityInfo = getCityInfo(city)
-  let baseDisplay = ''
+// 日付をYYYY/MM/DD形式にフォーマット
+const formatDate = (dateStr: string) => {
+  const date = new Date(dateStr)
+  const year = date.getFullYear()
+  const month = String(date.getMonth() + 1).padStart(2, '0')
+  const day = String(date.getDate()).padStart(2, '0')
+  return `${year}/${month}/${day}`
+}
 
-  // 読み仮名がある場合は含めて表示
-  if (city.yomi && city.yomi.trim() !== '') {
-    baseDisplay = `${city.name} (${city.yomi} ${cityInfo} ${city.code}`
-  } else {
-    baseDisplay = `${city.name} (${cityInfo} ${city.code}`
+// 一覧表示用：都道府県名、郡名、自治体名、読み方、存続期間を返す
+const getCityDisplayParts = (city: City) => {
+  const pref = dataStore.prefByCode.get(city.prefecture_code)
+  const county = dataStore.countyByCode.get(city.county_code)
+  
+  // 存続期間をフォーマット
+  const hasValidFrom = city.valid_from && city.valid_from.trim() !== ''
+  const hasValidTo = city.valid_to && city.valid_to.trim() !== ''
+  
+  let period = ''
+  if (!hasValidFrom && !hasValidTo) {
+    period = '現存'
+  } else if (!hasValidFrom && hasValidTo) {
+    period = `〜${formatDate(city.valid_to)}`
+  } else if (hasValidFrom && !hasValidTo) {
+    period = `${formatDate(city.valid_from)}〜現存`
+  } else if (hasValidFrom && hasValidTo) {
+    period = `${formatDate(city.valid_from)}〜${formatDate(city.valid_to)}`
   }
-
-  // 存続期間の開始日を取得（YYYY-MM-DD形式から日本語形式に変換）
-  let validFromStr = ''
-  if (city.valid_from && city.valid_from.trim() !== '') {
-    const validFromDate = new Date(city.valid_from)
-    validFromStr = validFromDate
-      .toLocaleDateString('ja-JP', {
-        year: 'numeric',
-        month: '2-digit',
-        day: '2-digit',
-      })
-      .replace(/\//g, '/')
-  }
-
-  // 存続期間を追加（現存/消滅の区別を明確に表示）
-  if (city.valid_to && city.valid_to.trim() !== '') {
-    // 消滅自治体の場合：開始日〜廃止日を表示
-    const validToDate = new Date(city.valid_to)
-    const validToStr = validToDate
-      .toLocaleDateString('ja-JP', {
-        year: 'numeric',
-        month: '2-digit',
-        day: '2-digit',
-      })
-      .replace(/\//g, '/')
-    const period = validFromStr ? `${validFromStr}〜${validToStr}` : `〜${validToStr}`
-    return `${baseDisplay} ${period})`
-  } else {
-    // 現存自治体の場合：開始日〜現存
-    const period = validFromStr ? `${validFromStr}〜現存` : '現存'
-    return `${baseDisplay} ${period})`
+  
+  return {
+    pref: pref?.name || '',
+    county: county?.name || '',
+    name: city.name || '',
+    yomi: city.yomi && city.yomi.trim() !== '' ? city.yomi : '',
+    period: period,
   }
 }
 </script>

@@ -112,7 +112,7 @@
                       for="subprefecture-filter"
                       class="text-sm font-medium text-gray-700 whitespace-nowrap min-w-[80px]"
                     >
-                      振興局/支庁
+                      支庁
                     </label>
                     <select
                       id="subprefecture-filter"
@@ -210,7 +210,7 @@ const selectedPrefecture = ref('')
 const selectedSubprefecture = ref('')
 const selectedCounty = ref('')
 
-// 選択された都道府県の振興局/支庁一覧を取得
+// 選択された都道府県の支庁一覧を取得
 const availableSubprefectures = computed(() => {
   if (!selectedPrefecture.value) return []
   return dataStore.subprefectures.filter(
@@ -224,7 +224,7 @@ const availableCounties = computed(() => {
   return dataStore.counties.filter(county => county.prefecture_code === selectedPrefecture.value)
 })
 
-// 都道府県が変更されたときに振興局/支庁と郡の選択をリセット
+// 都道府県が変更されたときに支庁と郡の選択をリセット
 watch(selectedPrefecture, () => {
   selectedSubprefecture.value = ''
   selectedCounty.value = ''
@@ -252,7 +252,7 @@ const filteredCities = computed(() => {
   // まず検索クエリで絞り込み（市区町村名、読み仮名、都道府県名、郡名で検索）
   let cities = dataStore.searchCities(searchQuery.value)
 
-  // フィルター適用（現存/消滅、都道府県、振興局/支庁、郡での絞り込み）
+  // フィルター適用（現存/消滅、都道府県、支庁、郡での絞り込み）
   cities = cities.filter(city => {
     // 現存/消滅フィルター：valid_toが空の場合は現存自治体
     const isExisting = !city.valid_to || city.valid_to.trim() === ''
@@ -262,7 +262,7 @@ const filteredCities = computed(() => {
     // 都道府県フィルター
     if (selectedPrefecture.value && city.prefecture_code !== selectedPrefecture.value) return false
 
-    // 振興局/支庁フィルター（都道府県が選択されている場合のみ適用）
+    // 支庁フィルター（都道府県が選択されている場合のみ適用）
     if (selectedSubprefecture.value && city.subprefecture_code !== selectedSubprefecture.value)
       return false
 

@@ -7,7 +7,7 @@ export const PrefSchema = z.object({
   yomi: z.string().optional().default(''),
 })
 
-// 振興局/支庁のスキーマ
+// 支庁のスキーマ
 export const SubprefectureSchema = z.object({
   code: z.string(),
   name: z.string(),

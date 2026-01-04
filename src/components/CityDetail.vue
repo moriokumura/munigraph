@@ -329,7 +329,7 @@ const getCityNameByCode = (code: string) => {
   return city ? `${city.name} (${cityInfo})` : `不明な市区町村 (${code})`
 }
 
-// 市区町村情報を取得（都道府県名と郡名のみ、振興局/支庁は除外）
+// 市区町村情報を取得（都道府県名と郡名のみ、支庁は除外）
 const getCityInfo = (city: City) => {
   const pref = dataStore.prefByCode.get(city.prefecture_code)
   const county = dataStore.countyByCode.get(city.county_code)
@@ -350,7 +350,7 @@ const getCityInfo = (city: City) => {
   return parts.join(' ')
 }
 
-// 振興局/支庁情報を取得
+// 支庁情報を取得
 const getSubprefectureInfo = (city: City) => {
   const subpref = dataStore.subprefByCode.get(city.subprefecture_code)
 
