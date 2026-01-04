@@ -1,6 +1,12 @@
 import { defineStore } from 'pinia'
-import type { Pref, County, City, Change } from '@/types/municipality'
-import { PrefSchema, CountySchema, CitySchema, ChangeSchema } from '@/types/municipality'
+import type { Pref, Subprefecture, County, City, Change } from '@/types/municipality'
+import {
+  PrefSchema,
+  SubprefectureSchema,
+  CountySchema,
+  CitySchema,
+  ChangeSchema,
+} from '@/types/municipality'
 import { fetchCsv } from '@/utils/csv-loader'
 
 export const useDataStore = defineStore('data', {
@@ -9,6 +15,7 @@ export const useDataStore = defineStore('data', {
     loading: false,
     error: null as string | null,
     prefs: [] as Pref[],
+    subprefectures: [] as Subprefecture[],
     counties: [] as County[],
     cities: [] as City[],
     changes: [] as Change[],
@@ -16,6 +23,7 @@ export const useDataStore = defineStore('data', {
     eventsByAfter: new Map<string, Change[]>(),
     eventsByBefore: new Map<string, Change[]>(),
     prefByCode: new Map<string, Pref>(),
+    subprefByCode: new Map<string, Subprefecture>(),
     countyByCode: new Map<string, County>(),
   }),
 
@@ -47,14 +55,16 @@ export const useDataStore = defineStore('data', {
 
       try {
         const base = import.meta.env.BASE_URL + 'data'
-        const [prefsRaw, countiesRaw, citiesRaw, changesRaw] = await Promise.all([
+        const [prefsRaw, subprefsRaw, countiesRaw, citiesRaw, changesRaw] = await Promise.all([
           fetchCsv(`${base}/prefectures.csv`),
+          fetchCsv(`${base}/subprefectures.csv`),
           fetchCsv(`${base}/counties.csv`),
           fetchCsv(`${base}/cities.csv`),
           fetchCsv(`${base}/change_events.csv`),
         ])
 
         this.prefs = prefsRaw.map(r => PrefSchema.parse(r))
+        this.subprefectures = subprefsRaw.map(r => SubprefectureSchema.parse(r))
         this.counties = countiesRaw.map(r => CountySchema.parse(r))
         this.cities = citiesRaw.map(r => CitySchema.parse(r))
         this.changes = changesRaw.map(r => ChangeSchema.parse(r))
@@ -62,6 +72,7 @@ export const useDataStore = defineStore('data', {
         // インデックスを構築
         this.cityByCode = new Map(this.cities.map(c => [c.code, c]))
         this.prefByCode = new Map(this.prefs.map(p => [p.code, p]))
+        this.subprefByCode = new Map(this.subprefectures.map(s => [s.code, s]))
         this.countyByCode = new Map(this.counties.map(c => [c.code, c]))
 
         // イベントマップを構築
@@ -94,10 +105,12 @@ export const useDataStore = defineStore('data', {
       this.loading = false
       this.error = null
       this.prefs = []
+      this.subprefectures = []
       this.counties = []
       this.cities = []
       this.changes = []
       this.cityByCode = new Map()
+      this.subprefByCode = new Map()
       this.eventsByAfter = new Map()
       this.eventsByBefore = new Map()
       this.prefByCode = new Map()
@@ -121,7 +134,7 @@ export const useDataStore = defineStore('data', {
 
     /**
      * 市区町村を検索（現存・消滅両方を含む）
-     * @param query 検索クエリ（市区町村名、読み仮名、都道府県名、郡名で検索）
+     * @param query 検索クエリ（市区町村名、読み仮名、都道府県名、郡名、支庁/振興局名で検索）
      */
     searchCities(query: string) {
       if (!query.trim()) {
@@ -139,13 +152,18 @@ export const useDataStore = defineStore('data', {
         const county = this.countyByCode.get(city.county_code)
         const countyName = county?.name.toLowerCase() || ''
         const countyYomi = county?.yomi.toLowerCase() || ''
+        const subpref = this.subprefByCode.get(city.subprefecture_code)
+        const subprefName = subpref?.name.toLowerCase() || ''
+        const subprefYomi = subpref?.yomi.toLowerCase() || ''
 
         return (
           cityName.includes(lowerQuery) ||
           cityYomi.includes(lowerQuery) ||
           prefName.includes(lowerQuery) ||
           countyName.includes(lowerQuery) ||
-          countyYomi.includes(lowerQuery)
+          countyYomi.includes(lowerQuery) ||
+          subprefName.includes(lowerQuery) ||
+          subprefYomi.includes(lowerQuery)
         )
       })
     },

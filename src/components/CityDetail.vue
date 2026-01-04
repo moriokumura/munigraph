@@ -27,6 +27,9 @@
         </div>
         <div><span class="font-medium">コード:</span> {{ selectedCity.code }}</div>
         <div><span class="font-medium">所在地:</span> {{ getCityInfo(selectedCity) }}</div>
+        <div v-if="getSubprefectureInfo(selectedCity)">
+          <span class="font-medium">支庁:</span> {{ getSubprefectureInfo(selectedCity) }}
+        </div>
         <div><span class="font-medium">存続期間:</span> {{ getValidityPeriod(selectedCity) }}</div>
       </div>
     </div>
@@ -326,13 +329,15 @@ const getCityNameByCode = (code: string) => {
   return city ? `${city.name} (${cityInfo})` : `不明な市区町村 (${code})`
 }
 
-// 市区町村情報を取得（郡名に読み仮名を含める）
+// 市区町村情報を取得（都道府県名と郡名のみ、振興局/支庁は除外）
 const getCityInfo = (city: City) => {
   const pref = dataStore.prefByCode.get(city.prefecture_code)
   const county = dataStore.countyByCode.get(city.county_code)
 
   const parts: string[] = []
   if (pref?.name) parts.push(pref.name)
+
+  // 郡を表示
   if (county?.name) {
     // 郡名に読み仮名がある場合は追加
     if (county.yomi && county.yomi.trim() !== '') {
@@ -343,6 +348,19 @@ const getCityInfo = (city: City) => {
   }
 
   return parts.join(' ')
+}
+
+// 振興局/支庁情報を取得
+const getSubprefectureInfo = (city: City) => {
+  const subpref = dataStore.subprefByCode.get(city.subprefecture_code)
+
+  if (!subpref?.name) return ''
+
+  if (subpref.yomi && subpref.yomi.trim() !== '') {
+    return `${subpref.name} (${subpref.yomi})`
+  } else {
+    return subpref.name
+  }
 }
 
 // 市区町村名と読み方を組み合わせて表示
@@ -434,7 +452,7 @@ const formatDate = (dateStr: string) => {
 const getWikipediaUrl = (city: City) => {
   // 市区町村名から不要な文字を除去（コード部分など）
   const cityName = city.name.trim()
-  
+
   // Wikipedia日本語版のURL
   // 例: https://ja.wikipedia.org/wiki/弓削町
   // シンプルに市区町村名のみで検索

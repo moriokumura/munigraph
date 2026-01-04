@@ -65,7 +65,7 @@ const selectCity = (city: City) => {
   emit('citySelected', city)
 }
 
-// 市区町村情報を取得
+// 市区町村情報を取得（都道府県名と郡名のみ、振興局/支庁は除外）
 const getCityInfo = (city: City) => {
   const pref = dataStore.prefByCode.get(city.prefecture_code)
   const county = dataStore.countyByCode.get(city.county_code)

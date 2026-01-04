@@ -101,9 +101,32 @@
                       v-model="selectedPrefecture"
                       class="flex-1 px-3 py-2 border-2 border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-sm bg-white"
                     >
-                      <option value="">すべての都道府県</option>
+                      <option value="">すべて</option>
                       <option v-for="pref in dataStore.prefs" :key="pref.code" :value="pref.code">
                         {{ pref.name }}
+                      </option>
+                    </select>
+                  </div>
+                  <div class="flex items-center gap-3">
+                    <label
+                      for="subprefecture-filter"
+                      class="text-sm font-medium text-gray-700 whitespace-nowrap min-w-[80px]"
+                    >
+                      振興局/支庁
+                    </label>
+                    <select
+                      id="subprefecture-filter"
+                      v-model="selectedSubprefecture"
+                      :disabled="!selectedPrefecture || availableSubprefectures.length === 0"
+                      class="flex-1 px-3 py-2 border-2 border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 disabled:bg-gray-100 disabled:text-gray-500 text-sm bg-white"
+                    >
+                      <option value="">すべて</option>
+                      <option
+                        v-for="subpref in availableSubprefectures"
+                        :key="subpref.code"
+                        :value="subpref.code"
+                      >
+                        {{ subpref.name }} ({{ subpref.yomi }})
                       </option>
                     </select>
                   </div>
@@ -120,7 +143,7 @@
                       :disabled="!selectedPrefecture"
                       class="flex-1 px-3 py-2 border-2 border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 disabled:bg-gray-100 disabled:text-gray-500 text-sm bg-white"
                     >
-                      <option value="">すべての郡</option>
+                      <option value="">すべて</option>
                       <option
                         v-for="county in availableCounties"
                         :key="county.code"
@@ -184,7 +207,16 @@ const isCollapsed = ref(false)
 const showExisting = ref(true)
 const showExtinct = ref(true)
 const selectedPrefecture = ref('')
+const selectedSubprefecture = ref('')
 const selectedCounty = ref('')
+
+// 選択された都道府県の振興局/支庁一覧を取得
+const availableSubprefectures = computed(() => {
+  if (!selectedPrefecture.value) return []
+  return dataStore.subprefectures.filter(
+    subpref => subpref.prefecture_code === selectedPrefecture.value
+  )
+})
 
 // 選択された都道府県の郡一覧を取得
 const availableCounties = computed(() => {
@@ -192,8 +224,9 @@ const availableCounties = computed(() => {
   return dataStore.counties.filter(county => county.prefecture_code === selectedPrefecture.value)
 })
 
-// 都道府県が変更されたときに郡の選択をリセット
+// 都道府県が変更されたときに振興局/支庁と郡の選択をリセット
 watch(selectedPrefecture, () => {
+  selectedSubprefecture.value = ''
   selectedCounty.value = ''
 })
 
@@ -207,6 +240,7 @@ const resetFilters = () => {
   showExisting.value = true
   showExtinct.value = true
   selectedPrefecture.value = ''
+  selectedSubprefecture.value = ''
   selectedCounty.value = ''
   searchQuery.value = ''
 }
@@ -218,7 +252,7 @@ const filteredCities = computed(() => {
   // まず検索クエリで絞り込み（市区町村名、読み仮名、都道府県名、郡名で検索）
   let cities = dataStore.searchCities(searchQuery.value)
 
-  // フィルター適用（現存/消滅、都道府県、郡での絞り込み）
+  // フィルター適用（現存/消滅、都道府県、振興局/支庁、郡での絞り込み）
   cities = cities.filter(city => {
     // 現存/消滅フィルター：valid_toが空の場合は現存自治体
     const isExisting = !city.valid_to || city.valid_to.trim() === ''
@@ -227,6 +261,10 @@ const filteredCities = computed(() => {
 
     // 都道府県フィルター
     if (selectedPrefecture.value && city.prefecture_code !== selectedPrefecture.value) return false
+
+    // 振興局/支庁フィルター（都道府県が選択されている場合のみ適用）
+    if (selectedSubprefecture.value && city.subprefecture_code !== selectedSubprefecture.value)
+      return false
 
     // 郡フィルター（都道府県が選択されている場合のみ適用）
     if (selectedCounty.value && city.county_code !== selectedCounty.value) return false
