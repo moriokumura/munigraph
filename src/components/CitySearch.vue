@@ -38,7 +38,7 @@
           <div class="p-6">
             <div class="grid grid-cols-1 lg:grid-cols-4 gap-6">
               <!-- キーワード検索 -->
-              <div class="lg:col-span-2">
+              <div>
                 <div class="flex items-center gap-3">
                   <label
                     for="search-input"
@@ -85,6 +85,53 @@
                 </div>
               </div>
 
+              <!-- 自治体の種類フィルター -->
+              <div>
+                <label class="text-sm font-medium text-gray-700 mb-2 block">自治体の種類</label>
+                <div class="flex gap-4 flex-wrap">
+                  <label
+                    class="flex items-center gap-2 cursor-pointer p-2 rounded-lg hover:bg-gray-50"
+                  >
+                    <input
+                      v-model="showCity"
+                      type="checkbox"
+                      class="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                    />
+                    <span class="text-sm font-medium text-gray-700">市</span>
+                  </label>
+                  <label
+                    class="flex items-center gap-2 cursor-pointer p-2 rounded-lg hover:bg-gray-50"
+                  >
+                    <input
+                      v-model="showTown"
+                      type="checkbox"
+                      class="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                    />
+                    <span class="text-sm font-medium text-gray-700">町</span>
+                  </label>
+                  <label
+                    class="flex items-center gap-2 cursor-pointer p-2 rounded-lg hover:bg-gray-50"
+                  >
+                    <input
+                      v-model="showVillage"
+                      type="checkbox"
+                      class="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                    />
+                    <span class="text-sm font-medium text-gray-700">村</span>
+                  </label>
+                  <label
+                    class="flex items-center gap-2 cursor-pointer p-2 rounded-lg hover:bg-gray-50"
+                  >
+                    <input
+                      v-model="showSpecialWard"
+                      type="checkbox"
+                      class="rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                    />
+                    <span class="text-sm font-medium text-gray-700">特別区</span>
+                  </label>
+                </div>
+              </div>
+
               <!-- 地域フィルター -->
               <div>
                 <label class="text-sm font-medium text-gray-700 mb-2 block">地域</label>
@@ -109,29 +156,6 @@
                   </div>
                   <div class="flex items-center gap-3">
                     <label
-                      for="subprefecture-filter"
-                      class="text-sm font-medium text-gray-700 whitespace-nowrap min-w-[80px]"
-                    >
-                      支庁
-                    </label>
-                    <select
-                      id="subprefecture-filter"
-                      v-model="selectedSubprefecture"
-                      :disabled="!selectedPrefecture || availableSubprefectures.length === 0"
-                      class="flex-1 px-3 py-2 border-2 border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 disabled:bg-gray-100 disabled:text-gray-500 text-sm bg-white"
-                    >
-                      <option value="">すべて</option>
-                      <option
-                        v-for="subpref in availableSubprefectures"
-                        :key="subpref.code"
-                        :value="subpref.code"
-                      >
-                        {{ subpref.name }} ({{ subpref.yomi }})
-                      </option>
-                    </select>
-                  </div>
-                  <div class="flex items-center gap-3">
-                    <label
                       for="county-filter"
                       class="text-sm font-medium text-gray-700 whitespace-nowrap min-w-[80px]"
                     >
@@ -150,6 +174,29 @@
                         :value="county.code"
                       >
                         {{ county.name }} ({{ county.yomi }})
+                      </option>
+                    </select>
+                  </div>
+                  <div class="flex items-center gap-3">
+                    <label
+                      for="subprefecture-filter"
+                      class="text-sm font-medium text-gray-700 whitespace-nowrap min-w-[80px]"
+                    >
+                      支庁
+                    </label>
+                    <select
+                      id="subprefecture-filter"
+                      v-model="selectedSubprefecture"
+                      :disabled="!selectedPrefecture || availableSubprefectures.length === 0"
+                      class="flex-1 px-3 py-2 border-2 border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 disabled:bg-gray-100 disabled:text-gray-500 text-sm bg-white"
+                    >
+                      <option value="">すべて</option>
+                      <option
+                        v-for="subpref in availableSubprefectures"
+                        :key="subpref.code"
+                        :value="subpref.code"
+                      >
+                        {{ subpref.name }} ({{ subpref.yomi }})
                       </option>
                     </select>
                   </div>
@@ -206,6 +253,10 @@ const isCollapsed = ref(false)
 // フィルター設定
 const showExisting = ref(true)
 const showExtinct = ref(true)
+const showCity = ref(true)
+const showTown = ref(true)
+const showVillage = ref(true)
+const showSpecialWard = ref(true)
 const selectedPrefecture = ref('')
 const selectedSubprefecture = ref('')
 const selectedCounty = ref('')
@@ -239,6 +290,10 @@ const toggleCollapsed = () => {
 const resetFilters = () => {
   showExisting.value = true
   showExtinct.value = true
+  showCity.value = true
+  showTown.value = true
+  showVillage.value = true
+  showSpecialWard.value = true
   selectedPrefecture.value = ''
   selectedSubprefecture.value = ''
   selectedCounty.value = ''
@@ -252,12 +307,23 @@ const filteredCities = computed(() => {
   // まず検索クエリで絞り込み（市区町村名、読み仮名、都道府県名、郡名で検索）
   let cities = dataStore.searchCities(searchQuery.value)
 
-  // フィルター適用（現存/消滅、都道府県、支庁、郡での絞り込み）
+  // フィルター適用（現存/消滅、都道府県、支庁、郡、自治体の種類での絞り込み）
   cities = cities.filter(city => {
     // 現存/消滅フィルター：valid_toが空の場合は現存自治体
     const isExisting = !city.valid_to || city.valid_to.trim() === ''
     if (isExisting && !showExisting.value) return false
     if (!isExisting && !showExtinct.value) return false
+
+    // 自治体の種類フィルター
+    const cityType = city.name?.endsWith('市') ? 'city' :
+                     city.name?.endsWith('町') ? 'town' :
+                     city.name?.endsWith('村') ? 'village' :
+                     city.name?.endsWith('区') ? 'ward' : null
+
+    if (cityType === 'city' && !showCity.value) return false
+    if (cityType === 'town' && !showTown.value) return false
+    if (cityType === 'village' && !showVillage.value) return false
+    if (cityType === 'ward' && !showSpecialWard.value) return false
 
     // 都道府県フィルター
     if (selectedPrefecture.value && city.prefecture_code !== selectedPrefecture.value) return false
