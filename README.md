@@ -77,12 +77,11 @@ npm run format
 npm run preview
 ```
 
-## ToDo
+### デプロイ
+- mainブランチにpushするとGHAによりGitHub Pagesにデプロイされます。
+- https://moriokumura.github.io/munigraph/#/browse
 
-### データ問題
-- 東京23区を追加、政令市の区を下位概念に移動
-- 政令指定都市は区名しかなく、市名がない
-  - しかも消滅した区が現存扱いになっている
+## ToDo
 
 #### データ不足
 - 明治期〜1970年の期間のデータがない
@@ -93,4 +92,5 @@ npm run preview
 - initialのコード形式を変えたい
 
 ### 実装
+- クイズページ
 - ノード表示に変え、選択中の自治体が二重表示にならないようにしたい
