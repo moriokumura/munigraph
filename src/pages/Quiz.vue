@@ -48,79 +48,13 @@
           </div>
           <h2 class="text-2xl font-semibold text-gray-800 mb-4">クイズ機能</h2>
           <p class="text-gray-600 mb-8">日本の自治体に関するクイズ機能は現在開発中です。</p>
-
-          <div class="bg-blue-50 border border-blue-200 rounded-lg p-6 mb-8">
-            <h3 class="text-lg font-medium text-blue-800 mb-2">予定されている機能</h3>
-            <ul class="text-blue-700 space-y-2 text-left max-w-md mx-auto">
-              <li class="flex items-center">
-                <svg
-                  class="mr-2 text-blue-500"
-                  fill="currentColor"
-                  viewBox="0 0 20 20"
-                  style="width: 16px; height: 16px"
-                >
-                  <path
-                    fill-rule="evenodd"
-                    d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z"
-                    clip-rule="evenodd"
-                  ></path>
-                </svg>
-                都道府県・市区町村名クイズ
-              </li>
-              <li class="flex items-center">
-                <svg
-                  class="mr-2 text-blue-500"
-                  fill="currentColor"
-                  viewBox="0 0 20 20"
-                  style="width: 16px; height: 16px"
-                >
-                  <path
-                    fill-rule="evenodd"
-                    d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z"
-                    clip-rule="evenodd"
-                  ></path>
-                </svg>
-                廃置分合の歴史クイズ
-              </li>
-              <li class="flex items-center">
-                <svg
-                  class="mr-2 text-blue-500"
-                  fill="currentColor"
-                  viewBox="0 0 20 20"
-                  style="width: 16px; height: 16px"
-                >
-                  <path
-                    fill-rule="evenodd"
-                    d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z"
-                    clip-rule="evenodd"
-                  ></path>
-                </svg>
-                難易度別問題
-              </li>
-              <li class="flex items-center">
-                <svg
-                  class="mr-2 text-blue-500"
-                  fill="currentColor"
-                  viewBox="0 0 20 20"
-                  style="width: 16px; height: 16px"
-                >
-                  <path
-                    fill-rule="evenodd"
-                    d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z"
-                    clip-rule="evenodd"
-                  ></path>
-                </svg>
-                スコア機能
-              </li>
-            </ul>
-          </div>
         </div>
       </div>
 
       <!-- ナビゲーション -->
       <div class="flex justify-center space-x-4">
         <router-link
-          to="/"
+          :to="{ name: 'home' }"
           class="inline-flex items-center px-6 py-3 border border-gray-300 text-base font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-purple-500 transition-colors duration-200"
         >
           <svg
@@ -140,7 +74,7 @@
           ホーム
         </router-link>
         <router-link
-          to="/browse"
+          :to="{ name: 'browse' }"
           class="inline-flex items-center px-6 py-3 border border-transparent text-base font-medium rounded-md text-white bg-purple-600 hover:bg-purple-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-purple-500 transition-colors duration-200"
         >
           <svg
