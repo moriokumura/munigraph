@@ -349,12 +349,4 @@ watch(
   },
   { immediate: true }
 )
-
-// 市区町村情報を取得
-const getCityInfo = (city: City) => {
-  const pref = dataStore.prefByCode.get(city.prefecture_code)
-  const county = dataStore.countyByCode.get(city.county_code)
-  const parts = [pref?.name, county?.name].filter(Boolean)
-  return parts.join(' ')
-}
 </script>

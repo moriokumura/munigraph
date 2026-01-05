@@ -21,7 +21,6 @@
             class="border border-gray-200 rounded-lg p-4 hover:bg-gray-50 cursor-pointer focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2"
             tabindex="0"
             role="button"
-            :aria-label="`${city.name}の詳細を表示 (${getCityInfo(city)})`"
             @click="selectCity(city)"
             @keydown.enter="selectCity(city)"
             @keydown.space.prevent="selectCity(city)"
@@ -67,14 +66,6 @@ const dataStore = useDataStore()
 // 市区町村選択
 const selectCity = (city: City) => {
   emit('citySelected', city)
-}
-
-// 市区町村情報を取得（都道府県名と郡名のみ、支庁は除外）
-const getCityInfo = (city: City) => {
-  const pref = dataStore.prefByCode.get(city.prefecture_code)
-  const county = dataStore.countyByCode.get(city.county_code)
-  const parts = [pref?.name, county?.name].filter(Boolean)
-  return parts.join(' ')
 }
 
 // 日付をYYYY/MM/DD形式にフォーマット

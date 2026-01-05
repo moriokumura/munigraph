@@ -25,7 +25,6 @@
         <div v-if="selectedCity.yomi && selectedCity.yomi.trim() !== ''">
           <span class="font-medium">読み方:</span> {{ selectedCity.yomi }}
         </div>
-        <div><span class="font-medium">コード:</span> {{ selectedCity.code }}</div>
         <div><span class="font-medium">所在地:</span> {{ getCityInfo(selectedCity) }}</div>
         <div v-if="getSubprefectureInfo(selectedCity)">
           <span class="font-medium">支庁:</span> {{ getSubprefectureInfo(selectedCity) }}
@@ -189,7 +188,7 @@
 
       <!-- イベントがない場合 -->
       <div v-if="!groupedAfterEvent && !groupedBeforeEvent" class="text-gray-500">
-        この市区町村には直前・直後の廃置分合イベントがありません。
+        この自治体のイベントが登録されていません。
       </div>
     </div>
   </div>
@@ -325,8 +324,17 @@ const selectCityByCode = (cityCode: string, fromEventDate?: string) => {
 // 市区町村コードから名前を取得
 const getCityNameByCode = (code: string) => {
   const city = dataStore.cityByCode.get(code)
-  const cityInfo = city ? getCityInfo(city) : ''
-  return city ? `${city.name} (${cityInfo})` : `不明な市区町村 (${code})`
+  if (!city) return `不明な市区町村 (${code})`
+
+  const pref = dataStore.prefByCode.get(city.prefecture_code)
+  const county = dataStore.countyByCode.get(city.county_code)
+
+  let name = ''
+  if (pref?.name) name += pref.name + ' '
+  if (county?.name) name += county.name + ' '
+  name += city.name
+
+  return name
 }
 
 // 市区町村情報を取得（都道府県名と郡名のみ、支庁は除外）
@@ -368,11 +376,18 @@ const formatCityWithYomi = (code: string) => {
   const city = dataStore.cityByCode.get(code)
   if (!city) return `不明な市区町村 (${code})`
 
-  const cityInfo = getCityInfo(city)
+  const pref = dataStore.prefByCode.get(city.prefecture_code)
+  const county = dataStore.countyByCode.get(city.county_code)
+
+  let display = ''
+  if (pref?.name) display += pref.name + ' '
+  if (county?.name) display += county.name + ' '
+  display += city.name
+
   if (city.yomi && city.yomi.trim() !== '') {
-    return `${city.name} (${city.yomi} ${cityInfo} ${code})`
+    return `${display} (${city.yomi})`
   } else {
-    return `${city.name} (${cityInfo} ${code})`
+    return display
   }
 }
 
