@@ -208,7 +208,7 @@
             <div class="flex justify-between items-center pt-6 border-t border-gray-100 mt-6">
               <div class="text-sm text-gray-600">
                 <span class="font-medium text-blue-600">{{ filteredCities.length }}</span
-                >件の市区町村を表示中
+                >件を表示中
               </div>
               <button
                 class="px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 border border-gray-300 rounded-lg hover:bg-gray-200 focus:outline-none focus:ring-2 focus:ring-gray-500 focus:ring-offset-2 transition-colors"

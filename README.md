@@ -82,8 +82,6 @@ npm run preview
 - https://moriokumura.github.io/munigraph/#/browse
 
 ## ToDo
-
-- 現存する町が4多い
 - 北海道の市に振興局がない
 - 編入の場合の直後イベントの表示で、存続自治体が変化前に表示されない
 
