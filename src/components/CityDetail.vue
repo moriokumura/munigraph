@@ -1,5 +1,5 @@
 <template>
-  <div v-if="selectedCity" class="mt-8 border-t pt-6">
+  <div v-if="selectedCity" ref="detailContainer" class="mt-8 border-t pt-6">
     <!-- 選択中の自治体名表示 -->
     <div class="mb-6">
       <div class="flex items-center gap-3 mb-2">
@@ -163,7 +163,7 @@
 </template>
 
 <script setup lang="ts">
-import { computed } from 'vue'
+import { computed, ref, nextTick } from 'vue'
 import { useDataStore } from '@/stores/data'
 import type { City } from '@/types/municipality'
 
@@ -181,6 +181,7 @@ const props = defineProps<Props>()
 const emit = defineEmits<Emits>()
 
 const dataStore = useDataStore()
+const detailContainer = ref<HTMLElement | null>(null)
 
 // 直前と直後のイベントを計算
 const adjacentEvents = computed(() => {
@@ -274,18 +275,16 @@ const groupedAfterEvent = computed(() => {
 })
 
 // 市区町村コードから市区町村を選択
-const selectCityByCode = (cityCode: string) => {
+const selectCityByCode = async (cityCode: string) => {
   const city = dataStore.cityByCode.get(cityCode)
   if (city) {
     emit('citySelected', city)
 
     // スクロールして選択された市区町村の詳細を表示
-    setTimeout(() => {
-      const element = document.querySelector('.mt-8.border-t.pt-6')
-      if (element) {
-        element.scrollIntoView({ behavior: 'smooth' })
-      }
-    }, 100)
+    await nextTick()
+    if (detailContainer.value) {
+      detailContainer.value.scrollIntoView({ behavior: 'smooth' })
+    }
   }
 }
 
