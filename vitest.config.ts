@@ -7,7 +7,8 @@ export default mergeConfig(
     test: {
       environment: 'jsdom',
       globals: true,
-      include: ['src/**/*.{test,spec}.{js,ts,jsx,tsx}'],
+      include: ['src/**/*.unit.test.ts'],
+      exclude: ['node_modules', 'dist', 'src/**/*.e2e.test.ts'],
       env: {
         BASE_URL: '/',
       },
