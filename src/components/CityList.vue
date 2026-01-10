@@ -54,6 +54,7 @@
 </template>
 
 <script setup lang="ts">
+import { format, parseISO } from 'date-fns'
 import { useDataStore } from '@/stores/data'
 import type { City } from '@/types/municipality'
 
@@ -78,13 +79,14 @@ const selectCity = (city: City) => {
   emit('citySelected', city)
 }
 
-// 日付をYYYY/MM/DD形式にフォーマット
+// 日付をyyyy/MM/dd形式にフォーマット
 const formatDate = (dateStr: string) => {
-  const date = new Date(dateStr)
-  const year = date.getFullYear()
-  const month = String(date.getMonth() + 1).padStart(2, '0')
-  const day = String(date.getDate()).padStart(2, '0')
-  return `${year}/${month}/${day}`
+  try {
+    return format(parseISO(dateStr), 'yyyy/MM/dd')
+  } catch (error) {
+    console.error('Error formatting date:', dateStr, error)
+    return dateStr
+  }
 }
 
 // 一覧表示用：都道府県名、郡名、自治体名、読み方、存続期間を返す

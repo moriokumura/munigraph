@@ -164,6 +164,7 @@
 
 <script setup lang="ts">
 import { computed, ref, nextTick } from 'vue'
+import { format, parseISO } from 'date-fns'
 import { useDataStore } from '@/stores/data'
 import type { City } from '@/types/municipality'
 
@@ -393,26 +394,12 @@ const formatAfterCityWithLabel = (code: string, eventType: string) => {
 const getValidityPeriod = (city: City) => {
   let validFromStr = ''
   if (city.valid_from && city.valid_from.trim() !== '') {
-    const validFromDate = new Date(city.valid_from)
-    validFromStr = validFromDate
-      .toLocaleDateString('ja-JP', {
-        year: 'numeric',
-        month: '2-digit',
-        day: '2-digit',
-      })
-      .replace(/\//g, '/')
+    validFromStr = format(parseISO(city.valid_from), 'yyyy/MM/dd')
   }
 
   if (city.valid_to && city.valid_to.trim() !== '') {
     // 消滅自治体の場合：開始日〜廃止日を表示
-    const validToDate = new Date(city.valid_to)
-    const validToStr = validToDate
-      .toLocaleDateString('ja-JP', {
-        year: 'numeric',
-        month: '2-digit',
-        day: '2-digit',
-      })
-      .replace(/\//g, '/')
+    const validToStr = format(parseISO(city.valid_to), 'yyyy/MM/dd')
     return validFromStr ? `${validFromStr}〜${validToStr}` : `〜${validToStr}`
   } else {
     // 現存自治体の場合：開始日〜現存
@@ -422,12 +409,12 @@ const getValidityPeriod = (city: City) => {
 
 // 日付フォーマット
 const formatDate = (dateStr: string) => {
-  const date = new Date(dateStr)
-  return date.toLocaleDateString('ja-JP', {
-    year: 'numeric',
-    month: 'long',
-    day: 'numeric',
-  })
+  try {
+    return format(parseISO(dateStr), 'yyyy年M月d日')
+  } catch (error) {
+    console.error('Error formatting date:', dateStr, error)
+    return dateStr
+  }
 }
 
 // WikipediaのURLを生成

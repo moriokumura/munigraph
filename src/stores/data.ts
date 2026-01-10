@@ -1,4 +1,5 @@
 import { defineStore } from 'pinia'
+import { parse, format } from 'date-fns'
 import type { Pref, Subprefecture, County, City, Change } from '@/types/municipality'
 import {
   PrefSchema,
@@ -243,10 +244,7 @@ export const useDataStore = defineStore('data', {
       if (codeDate && codeDate !== 'initial') {
         // 時期別コード（例：20201_20050101）の場合
         // コードの日付より後のイベントのみを取得（時系列の整合性を保つ）
-        const year = codeDate.substring(0, 4)
-        const month = codeDate.substring(4, 6)
-        const day = codeDate.substring(6, 8)
-        const codeDateStr = `${year}-${month}-${day}`
+        const codeDateStr = format(parse(codeDate, 'yyyyMMdd', new Date()), 'yyyy-MM-dd')
 
         filteredBeforeEvents = beforeEventsAll.filter(e => e.date > codeDateStr)
       } else if (codeDate === 'initial') {
@@ -275,10 +273,7 @@ export const useDataStore = defineStore('data', {
       const futureAfterEvents: Change[] = []
 
       if (codeDate && codeDate !== 'initial') {
-        const year = codeDate.substring(0, 4)
-        const month = codeDate.substring(4, 6)
-        const day = codeDate.substring(6, 8)
-        const codeDateStr = `${year}-${month}-${day}`
+        const codeDateStr = format(parse(codeDate, 'yyyyMMdd', new Date()), 'yyyy-MM-dd')
 
         // 同じベースコードでより新しい日付のイベントを検索
         for (const [eventCode, events] of this.eventsByAfter.entries()) {
@@ -405,10 +400,7 @@ export const useDataStore = defineStore('data', {
       if (codeDate && codeDate !== 'initial') {
         // コードの日付をYYYY-MM-DD形式に変換
         // 例: "20050101" → "2005-01-01"
-        const year = codeDate.substring(0, 4)
-        const month = codeDate.substring(4, 6)
-        const day = codeDate.substring(6, 8)
-        const codeDateStr = `${year}-${month}-${day}`
+        const codeDateStr = format(parse(codeDate, 'yyyyMMdd', new Date()), 'yyyy-MM-dd')
 
         filteredEvents = beforeEvents.filter(e => e.date <= codeDateStr)
       }
