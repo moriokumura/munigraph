@@ -69,7 +69,11 @@ npm run build
 ### Lint
 ```
 npm run lint
-npm run format
+```
+
+### Test
+```
+npm run test
 ```
 
 ### ビルド成果物のプレビュー
