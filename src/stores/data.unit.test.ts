@@ -1,11 +1,11 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest'
 import { setActivePinia, createPinia } from 'pinia'
 import { useDataStore } from './data'
-import { fetchCsv } from '@/utils/csv-loader'
-import type { Pref, City, Change, Subprefecture, County } from '@/types/municipality'
+import { fetchCsv } from '../utils/csv-loader'
+import type { Pref, City, Change, Subprefecture, County } from '../types/municipality'
 
 // csv-loaderのモック化
-vi.mock('@/utils/csv-loader', () => ({
+vi.mock('../utils/csv-loader', () => ({
   fetchCsv: vi.fn(),
 }))
 
@@ -90,7 +90,7 @@ describe('DataStore', () => {
 
     const currentCities = store.getCurrentCities()
     expect(currentCities).toHaveLength(1)
-    expect(currentCities[0].name).toBe('伊達市')
+    expect(currentCities[0]?.name).toBe('伊達市')
   })
 
   it('searchCitiesがクエリに一致する自治体を返すこと', async () => {
@@ -113,19 +113,19 @@ describe('DataStore', () => {
     const store = useDataStore()
     store.changes = mockChanges
     // eventsByAfter/Beforeの構築ロジックをシミュレート
-    store.eventsByAfter = new Map([['01233_19720401', [mockChanges[0]]]])
-    store.eventsByBefore = new Map([['01576_initial', [mockChanges[0]]]])
+    store.eventsByAfter = new Map([['01233_19720401', [mockChanges[0]]]] as [string, Change[]][])
+    store.eventsByBefore = new Map([['01576_initial', [mockChanges[0]]]] as [string, Change[]][])
     store.cityByCode = new Map(mockCities.map(c => [c.code, c]))
     store.loaded = true
 
     // 伊達町の直後イベント
     const dateMachiResult = store.getAdjacentEvents('01576_initial')
     expect(dateMachiResult.after).toHaveLength(1)
-    expect(dateMachiResult.after[0].event_type).toBe('市制施行')
+    expect(dateMachiResult.after[0]?.event_type).toBe('市制施行')
 
     // 伊達市の直前イベント
     const dateShiResult = store.getAdjacentEvents('01233_19720401')
     expect(dateShiResult.before).toHaveLength(1)
-    expect(dateShiResult.before[0].event_type).toBe('市制施行')
+    expect(dateShiResult.before[0]?.event_type).toBe('市制施行')
   })
 })

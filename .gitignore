@@ -23,9 +23,19 @@ dist-ssr
 *.sln
 *.sw?
 
+# Environment variables
+.env
+
+# Project specific
 rawdata
 scripts
 tmp
+
+# TypeScript
+*.tsbuildinfo
+
+# ESLint
+.eslintcache
 
 # Playwright
 /playwright-report/
