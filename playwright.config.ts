@@ -1,4 +1,4 @@
-import { defineConfig, devices } from '@playwright/test';
+import { defineConfig, devices } from '@playwright/test'
 
 /**
  * See https://playwright.dev/docs/test-configuration.
@@ -39,4 +39,4 @@ export default defineConfig({
     url: 'http://localhost:5173/munigraph/',
     reuseExistingServer: !process.env.CI,
   },
-});
+})

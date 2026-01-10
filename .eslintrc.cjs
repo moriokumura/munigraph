@@ -7,11 +7,11 @@ module.exports = {
     'plugin:@typescript-eslint/recommended',
     'plugin:import/recommended',
     'plugin:import/typescript',
-    'prettier'
+    'prettier',
   ],
   rules: {
     'vue/multi-word-component-names': 'off',
     '@typescript-eslint/consistent-type-imports': 'error',
-    'import/order': ['warn', { 'newlines-between': 'always', alphabetize: { order: 'asc' } }]
-  }
+    'import/order': ['warn', { 'newlines-between': 'always', alphabetize: { order: 'asc' } }],
+  },
 }

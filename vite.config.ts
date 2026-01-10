@@ -18,8 +18,8 @@ export default defineConfig({
     //   'Content-Security-Policy': "default-src 'self'; script-src 'self' 'unsafe-eval' 'unsafe-inline' 'wasm-unsafe-eval'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; connect-src 'self' ws: wss:;"
     // }
     hmr: {
-      overlay: true
-    }
+      overlay: true,
+    },
   },
   define: {
     __VUE_PROD_DEVTOOLS__: false,
@@ -27,10 +27,10 @@ export default defineConfig({
   esbuild: {
     // eval の使用を避けるための設定
     target: 'esnext',
-    format: 'esm'
+    format: 'esm',
   },
   optimizeDeps: {
     // 依存関係の最適化設定
-    include: ['vue', 'pinia', 'papaparse', 'zod']
-  }
+    include: ['vue', 'pinia', 'papaparse', 'zod'],
+  },
 })
