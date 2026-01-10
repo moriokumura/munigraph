@@ -315,10 +315,15 @@ const filteredCities = computed(() => {
     if (!isExisting && !showExtinct.value) return false
 
     // 自治体の種類フィルター
-    const cityType = city.name?.endsWith('市') ? 'city' :
-                     city.name?.endsWith('町') ? 'town' :
-                     city.name?.endsWith('村') ? 'village' :
-                     city.name?.endsWith('区') ? 'ward' : null
+    const cityType = city.name?.endsWith('市')
+      ? 'city'
+      : city.name?.endsWith('町')
+        ? 'town'
+        : city.name?.endsWith('村')
+          ? 'village'
+          : city.name?.endsWith('区')
+            ? 'ward'
+            : null
 
     if (cityType === 'city' && !showCity.value) return false
     if (cityType === 'town' && !showTown.value) return false

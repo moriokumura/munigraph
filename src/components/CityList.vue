@@ -28,11 +28,21 @@
             <div class="flex justify-between items-center">
               <div class="flex-1">
                 <h4 class="text-lg">
-                  <span v-if="getCityDisplayParts(city).pref" class="mr-1">{{ getCityDisplayParts(city).pref }}</span>
-                  <span v-if="getCityDisplayParts(city).county" class="mr-1">{{ getCityDisplayParts(city).county }}</span>
+                  <span v-if="getCityDisplayParts(city).pref" class="mr-1">{{
+                    getCityDisplayParts(city).pref
+                  }}</span>
+                  <span v-if="getCityDisplayParts(city).county" class="mr-1">{{
+                    getCityDisplayParts(city).county
+                  }}</span>
                   <span class="font-bold mr-1">{{ getCityDisplayParts(city).name }}</span>
-                  <span v-if="getCityDisplayParts(city).yomi"> ({{ getCityDisplayParts(city).yomi }})</span>
-                  <span v-if="getCityDisplayParts(city).period" class="ml-1 px-1.5 py-0.5 bg-gray-100 rounded text-sm">{{ getCityDisplayParts(city).period }}</span>
+                  <span v-if="getCityDisplayParts(city).yomi">
+                    ({{ getCityDisplayParts(city).yomi }})</span
+                  >
+                  <span
+                    v-if="getCityDisplayParts(city).period"
+                    class="ml-1 px-1.5 py-0.5 bg-gray-100 rounded text-sm"
+                    >{{ getCityDisplayParts(city).period }}</span
+                  >
                 </h4>
               </div>
             </div>
@@ -81,11 +91,11 @@ const formatDate = (dateStr: string) => {
 const getCityDisplayParts = (city: City) => {
   const pref = dataStore.prefByCode.get(city.prefecture_code)
   const county = dataStore.countyByCode.get(city.county_code)
-  
+
   // 存続期間をフォーマット
   const hasValidFrom = city.valid_from && city.valid_from.trim() !== ''
   const hasValidTo = city.valid_to && city.valid_to.trim() !== ''
-  
+
   let period = ''
   if (!hasValidFrom && !hasValidTo) {
     period = '現存'
@@ -96,7 +106,7 @@ const getCityDisplayParts = (city: City) => {
   } else if (hasValidFrom && hasValidTo) {
     period = `${formatDate(city.valid_from)}〜${formatDate(city.valid_to)}`
   }
-  
+
   return {
     pref: pref?.name || '',
     county: county?.name || '',
