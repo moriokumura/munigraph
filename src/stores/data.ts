@@ -228,10 +228,8 @@ export const useDataStore = defineStore('data', {
       const afterEvents = this.eventsByAfter.get(cityCode) || []
 
       // 最新の日付のイベントを取得（複数ある場合は最新のもの）
-      const latestDate =
-        afterEvents.length > 0
-          ? afterEvents.sort((a, b) => b.date.localeCompare(a.date))[0].date
-          : null
+      const sortedAfterEvents = [...afterEvents].sort((a, b) => b.date.localeCompare(a.date))
+      const latestDate = sortedAfterEvents.length > 0 ? sortedAfterEvents[0]!.date : null
 
       const beforeEvents = latestDate ? afterEvents.filter(e => e.date === latestDate) : []
 
@@ -254,10 +252,8 @@ export const useDataStore = defineStore('data', {
       } else if (codeDate === 'initial') {
         // initialコード（例：20581_initial）の場合
         // この自治体が消滅するイベントを取得
-        const latestBeforeDate =
-          beforeEventsAll.length > 0
-            ? beforeEventsAll.sort((a, b) => b.date.localeCompare(a.date))[0].date
-            : null
+        const sortedBeforeEvents = [...beforeEventsAll].sort((a, b) => b.date.localeCompare(a.date))
+        const latestBeforeDate = sortedBeforeEvents.length > 0 ? sortedBeforeEvents[0]!.date : null
 
         if (latestBeforeDate) {
           const latestBeforeEvents = beforeEventsAll.filter(e => e.date === latestBeforeDate)
@@ -306,10 +302,8 @@ export const useDataStore = defineStore('data', {
       const allFutureEvents = [...filteredBeforeEvents, ...futureAfterEvents]
 
       // 最も近い日付のイベントを取得
-      const earliestDate =
-        allFutureEvents.length > 0
-          ? allFutureEvents.sort((a, b) => a.date.localeCompare(b.date))[0].date
-          : null
+      const sortedFutureEvents = [...allFutureEvents].sort((a, b) => a.date.localeCompare(b.date))
+      const earliestDate = sortedFutureEvents.length > 0 ? sortedFutureEvents[0]!.date : null
 
       const afterEventsResult = earliestDate
         ? allFutureEvents.filter(e => e.date === earliestDate)
@@ -422,7 +416,9 @@ export const useDataStore = defineStore('data', {
       if (filteredEvents.length === 0) return events
 
       // 最新のイベントを取得（日付順）
-      const latestEvent = filteredEvents.sort((a, b) => b.date.localeCompare(a.date))[0]
+      const latestEvent = [...filteredEvents].sort((a, b) => b.date.localeCompare(a.date))[0]
+
+      if (!latestEvent) return events
 
       events.push(latestEvent)
 

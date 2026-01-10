@@ -59,18 +59,7 @@
                   :key="idx"
                   class="cursor-pointer text-blue-600 hover:text-blue-800 hover:underline mb-1"
                   :title="`${beforeCity}の詳細を表示`"
-                  @click="
-                    selectCityByCode(
-                      groupedBeforeEvent.beforeCityCodes[idx],
-                      isSurvivingCityInGroup(
-                        groupedBeforeEvent.beforeCityCodes[idx],
-                        groupedBeforeEvent.event_type,
-                        groupedBeforeEvent.afterCityCodes
-                      )
-                        ? groupedBeforeEvent.date
-                        : undefined
-                    )
-                  "
+                  @click="selectCityByCode(groupedBeforeEvent.beforeCityCodes[idx])"
                 >
                   {{
                     formatBeforeCityWithLabel(
@@ -90,12 +79,7 @@
                   :key="idx"
                   class="cursor-pointer text-blue-600 hover:text-blue-800 hover:underline mb-1"
                   :title="`${afterCity}の詳細を表示`"
-                  @click="
-                    selectCityByCode(
-                      groupedBeforeEvent.afterCityCodes[idx],
-                      groupedBeforeEvent.event_type === '編入' ? groupedBeforeEvent.date : undefined
-                    )
-                  "
+                  @click="selectCityByCode(groupedBeforeEvent.afterCityCodes[idx])"
                 >
                   {{
                     formatAfterCityWithLabel(
@@ -135,18 +119,7 @@
                   :key="idx"
                   class="cursor-pointer text-blue-600 hover:text-blue-800 hover:underline mb-1"
                   :title="`${beforeCity}の詳細を表示`"
-                  @click="
-                    selectCityByCode(
-                      groupedAfterEvent.beforeCityCodes[idx],
-                      isSurvivingCityInGroup(
-                        groupedAfterEvent.beforeCityCodes[idx],
-                        groupedAfterEvent.event_type,
-                        groupedAfterEvent.afterCityCodes
-                      )
-                        ? groupedAfterEvent.date
-                        : undefined
-                    )
-                  "
+                  @click="selectCityByCode(groupedAfterEvent.beforeCityCodes[idx])"
                 >
                   {{
                     formatBeforeCityWithLabel(
@@ -166,12 +139,7 @@
                   :key="idx"
                   class="cursor-pointer text-blue-600 hover:text-blue-800 hover:underline mb-1"
                   :title="`${afterCity}の詳細を表示`"
-                  @click="
-                    selectCityByCode(
-                      groupedAfterEvent.afterCityCodes[idx],
-                      groupedAfterEvent.event_type === '編入' ? groupedAfterEvent.date : undefined
-                    )
-                  "
+                  @click="selectCityByCode(groupedAfterEvent.afterCityCodes[idx])"
                 >
                   {{
                     formatAfterCityWithLabel(
@@ -306,7 +274,7 @@ const groupedAfterEvent = computed(() => {
 })
 
 // 市区町村コードから市区町村を選択
-const selectCityByCode = (cityCode: string, fromEventDate?: string) => {
+const selectCityByCode = (cityCode: string) => {
   const city = dataStore.cityByCode.get(cityCode)
   if (city) {
     emit('citySelected', city)

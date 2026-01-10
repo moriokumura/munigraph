@@ -68,7 +68,7 @@ interface Emits {
   (e: 'citySelected', city: City): void
 }
 
-const props = defineProps<Props>()
+defineProps<Props>()
 const emit = defineEmits<Emits>()
 
 const dataStore = useDataStore()

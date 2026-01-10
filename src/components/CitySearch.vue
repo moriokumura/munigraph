@@ -241,7 +241,7 @@ interface Emits {
   (e: 'filteredCitiesChanged', cities: City[]): void
 }
 
-const props = defineProps<Props>()
+defineProps<Props>()
 const emit = defineEmits<Emits>()
 
 const dataStore = useDataStore()
