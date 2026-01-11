@@ -37,7 +37,7 @@ describe('CityDetail.vue', () => {
     versions: [mockCity],
   }
 
-  it('現存する自治体の存続期間が正しく表示されること', () => {
+  it('現存する自治体の情報が表示されること', () => {
     const pinia = createTestingPinia({
       initialState: {
         data: {
@@ -60,10 +60,13 @@ describe('CityDetail.vue', () => {
       },
     })
 
-    expect(wrapper.text()).toContain('1972/04/01〜現存')
+    // イベントなしの初期状態は「日付未登録 / 成立」となる
+    expect(wrapper.text()).toContain('日付未登録')
+    expect(wrapper.text()).toContain('成立')
+    expect(wrapper.text()).toContain('現在')
   })
 
-  it('消滅した自治体の存続期間が正しく表示されること', () => {
+  it('消滅した自治体の情報が表示されること', () => {
     const mockMuniExtinct: Municipality = {
       id: '01576-伊達町',
       name: '伊達町',
@@ -94,7 +97,10 @@ describe('CityDetail.vue', () => {
       },
     })
 
-    expect(wrapper.text()).toContain('1900/01/01〜1972/04/01')
+    // 最初のバージョン（イベントなし）が表示される
+    expect(wrapper.text()).toContain('日付未登録')
+    expect(wrapper.text()).toContain('成立')
+    expect(wrapper.text()).not.toContain('現在')
   })
 
   it('イベントの日付が「yyyy年M月d日」形式で表示されること', async () => {

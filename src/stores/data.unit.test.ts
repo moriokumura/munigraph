@@ -215,4 +215,58 @@ describe('DataStore', () => {
     expect(store.municipalityById.has('01403-泊村')).toBe(true)
     expect(store.municipalityById.has('01696-泊村')).toBe(true)
   })
+
+  it('管轄変更でJISコードが変わっても名前が同じなら1つのエンティティに集約されること（門前町のケース）', async () => {
+    const store = useDataStore()
+    const mockMonzenCities: City[] = [
+      {
+        code: '17422_initial',
+        city_code: '17422',
+        name: '門前町',
+        yomi: 'もんぜんまち',
+        prefecture_code: '17',
+        subprefecture_code: '',
+        county_code: '17008', // 鳳至郡
+        valid_from: '',
+        valid_to: '2005-03-01',
+      },
+      {
+        code: '17462_20050301',
+        city_code: '17462',
+        name: '門前町',
+        yomi: 'もんぜんまち',
+        prefecture_code: '17',
+        subprefecture_code: '',
+        county_code: '17003', // 鳳珠郡
+        valid_from: '2005-03-01',
+        valid_to: '2006-02-01',
+      },
+    ]
+    const mockMonzenChanges: Change[] = [
+      {
+        code: 'event_monzen',
+        date: '2005-03-01',
+        event_type: '管轄変更',
+        city_code_before: '17422_initial',
+        city_code_after: '17462_20050301',
+      },
+    ]
+
+    vi.mocked(fetchCsv).mockImplementation(async (path: string) => {
+      if (path.endsWith('/cities.csv'))
+        return mockMonzenCities as unknown as Record<string, string>[]
+      if (path.endsWith('/change_events.csv'))
+        return mockMonzenChanges as unknown as Record<string, string>[]
+      return []
+    })
+
+    await store.loadAll()
+
+    // 異なるJISコードだが、管轄変更イベントで名前が同じなため1つに集約されるべき
+    expect(store.municipalities).toHaveLength(1)
+    expect(store.municipalityById.size).toBe(1)
+    const m = store.municipalities[0]
+    expect(m?.name).toBe('門前町')
+    expect(m?.versions).toHaveLength(2)
+  })
 })

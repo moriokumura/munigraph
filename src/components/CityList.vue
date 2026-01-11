@@ -31,6 +31,9 @@
                   <span v-if="getMunicipalityDisplayParts(municipality).pref" class="mr-1">{{
                     getMunicipalityDisplayParts(municipality).pref
                   }}</span>
+                  <span v-if="getMunicipalityDisplayParts(municipality).county" class="mr-1">{{
+                    getMunicipalityDisplayParts(municipality).county
+                  }}</span>
                   <span class="font-bold mr-1">{{
                     getMunicipalityDisplayParts(municipality).name
                   }}</span>
@@ -88,13 +91,16 @@ const formatDate = (dateStr: string) => {
   }
 }
 
-// 一覧表示用：都道府県名、自治体名、読み方、存続期間を返す
+// 一覧表示用：都道府県名、郡名、自治体名、読み方、存続期間を返す
 const getMunicipalityDisplayParts = (m: Municipality) => {
   const pref = dataStore.prefByCode.get(m.prefecture_code)
 
   // 全バージョンの期間を算出
   const firstVersion = m.versions[0]
   const lastVersion = m.versions[m.versions.length - 1]
+
+  // 最後のバージョンの郡名を取得
+  const county = lastVersion ? dataStore.countyByCode.get(lastVersion.county_code) : null
 
   const hasValidFrom = firstVersion?.valid_from && firstVersion.valid_from.trim() !== ''
   const hasValidTo = lastVersion?.valid_to && lastVersion.valid_to.trim() !== ''
@@ -110,10 +116,16 @@ const getMunicipalityDisplayParts = (m: Municipality) => {
     period = `${formatDate(firstVersion.valid_from)}〜${formatDate(lastVersion.valid_to)}`
   }
 
+  const yomiParts = []
+  if (pref?.yomi) yomiParts.push(pref.yomi)
+  if (county?.yomi) yomiParts.push(county.yomi)
+  yomiParts.push(m.yomi)
+
   return {
     pref: pref?.name || '',
+    county: county?.name || '',
     name: m.name || '',
-    yomi: m.yomi && m.yomi.trim() !== '' ? m.yomi : '',
+    yomi: yomiParts.filter(p => p && p.trim() !== '').join(' '),
     period: period,
   }
 }

@@ -72,16 +72,56 @@ export const useDataStore = defineStore('data', {
         this.cities = citiesRaw.map(r => CitySchema.parse(r))
         this.changes = changesRaw.map(r => ChangeSchema.parse(r))
 
+        // インデックスを構築
+        this.cityByCode = new Map(this.cities.map(c => [c.code, c]))
+        this.prefByCode = new Map(this.prefs.map(p => [p.code, p]))
+        this.subprefByCode = new Map(this.subprefectures.map(s => [s.code, s]))
+        this.countyByCode = new Map(this.counties.map(c => [c.code, c]))
+
+        // 同一自治体とみなすべき city_code のグループ化
+        // 名称変更を伴わない管轄変更などで city_code が変わるケースに対応
+        const codeAliasMap = new Map<string, string>() // city_code -> 代表city_code
+
+        // 再帰的に代表を探す関数
+        const findRepresentative = (code: string): string => {
+          const alias = codeAliasMap.get(code)
+          if (!alias || alias === code) return code
+          return findRepresentative(alias)
+        }
+
+        for (const ev of this.changes) {
+          if (ev.event_type === '管轄変更' || ev.event_type === '境界変更') {
+            const before = this.cityByCode.get(ev.city_code_before)
+            const after = this.cityByCode.get(ev.city_code_after)
+            if (before && after && before.name === after.name) {
+              const repBefore = findRepresentative(before.city_code)
+              const repAfter = findRepresentative(after.city_code)
+              if (repBefore !== repAfter) {
+                codeAliasMap.set(repAfter, repBefore)
+              }
+            }
+          }
+        }
+
+        // 全てのエイリアスを最終的な代表コードに向ける
+        const finalAliasMap = new Map<string, string>()
+        for (const code of new Set([
+          ...codeAliasMap.keys(),
+          ...this.cities.map(c => c.city_code),
+        ])) {
+          finalAliasMap.set(code, findRepresentative(code))
+        }
+
         // 自治体エンティティの集約
         const mMap = new Map<string, Municipality>()
         for (const city of this.cities) {
           // 名前が空のレコードはスキップ（データクレンジング）
           if (!city.name || city.name.trim() === '') continue
 
-          // 自治体コードと名前の組み合わせでユニークなエンティティを定義
-          // これにより「泊村(01403)」と「泊村(01696)」を分離しつつ、
-          // 同じ自治体のバージョン（年度違いなど）を集約する
-          const mId = `${city.city_code}-${city.name}`
+          // 代表となる city_code を取得
+          const representativeCode = finalAliasMap.get(city.city_code) || city.city_code
+          const mId = `${representativeCode}-${city.name}`
+
           if (!mMap.has(mId)) {
             mMap.set(mId, {
               id: mId,
@@ -109,12 +149,6 @@ export const useDataStore = defineStore('data', {
 
         this.municipalities = Array.from(mMap.values())
         this.municipalityById = mMap
-
-        // インデックスを構築
-        this.cityByCode = new Map(this.cities.map(c => [c.code, c]))
-        this.prefByCode = new Map(this.prefs.map(p => [p.code, p]))
-        this.subprefByCode = new Map(this.subprefectures.map(s => [s.code, s]))
-        this.countyByCode = new Map(this.counties.map(c => [c.code, c]))
 
         // イベントマップを構築
         this.eventsByAfter = new Map()
