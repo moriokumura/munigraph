@@ -6,7 +6,6 @@ import type { MunicipalityVersion, Municipality } from '@/types/municipality'
 
 describe('CityDetail.vue', () => {
   const mockCity: MunicipalityVersion = {
-    id: '01233_19720401',
     municipality_id: 'M002',
     city_code: '01233',
     subprefecture_code: '01013',
@@ -16,7 +15,6 @@ describe('CityDetail.vue', () => {
   }
 
   const mockHistoryCity: MunicipalityVersion = {
-    id: '01576_initial',
     municipality_id: 'M001',
     city_code: '01576',
     subprefecture_code: '01013',
@@ -38,7 +36,6 @@ describe('CityDetail.vue', () => {
       initialState: {
         data: {
           loaded: true,
-          versionById: new Map([[mockCity.id, mockCity]]),
           municipalityById: new Map([[mockMunicipality.id, mockMunicipality]]),
           eventsByAfter: new Map(),
           eventsByBefore: new Map(),
@@ -80,7 +77,6 @@ describe('CityDetail.vue', () => {
       initialState: {
         data: {
           loaded: true,
-          versionById: new Map([[mockHistoryCity.id, mockHistoryCity]]),
           municipalityById: new Map([[mockMuniExtinct.id, mockMuniExtinct]]),
           eventsByAfter: new Map(),
           eventsByBefore: new Map(),
@@ -114,8 +110,8 @@ describe('CityDetail.vue', () => {
       code: 'event1',
       date: '1972-04-01',
       event_type: '市制施行',
-      city_code_before: '01576_initial',
-      city_code_after: '01233_19720401',
+      municipality_id_before: 'M001',
+      municipality_id_after: 'M002',
     }
 
     const pinia = createTestingPinia({
@@ -124,10 +120,6 @@ describe('CityDetail.vue', () => {
         data: {
           loaded: true,
           changes: [mockChange],
-          versionById: new Map([
-            ['01576_initial', mockHistoryCity],
-            ['01233_19720401', mockCity],
-          ]),
           municipalityById: new Map<string, Municipality>([
             [
               'M001',
@@ -136,13 +128,13 @@ describe('CityDetail.vue', () => {
                 name: '伊達町',
                 yomi: 'だてちょう',
                 prefecture_code: '01',
-                versions: [],
+                versions: [mockHistoryCity],
               },
             ],
             ['M002', mockMunicipality],
           ]),
-          eventsByAfter: new Map([['01233_19720401', [mockChange]]]),
-          eventsByBefore: new Map([['01576_initial', [mockChange]]]),
+          eventsByAfter: new Map([['M002', [mockChange]]]),
+          eventsByBefore: new Map([['M001', [mockChange]]]),
           prefByCode: new Map([['01', { code: '01', name: '北海道' }]]),
           countyByCode: new Map([['01069', { code: '01069', name: '有珠郡' }]]),
           subprefByCode: new Map([['01013', { code: '01013', name: '胆振総合振興局' }]]),

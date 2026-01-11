@@ -25,8 +25,9 @@ export const CountySchema = z.object({
 
 // 市区町村バージョンのスキーマ（旧City）
 export const MunicipalityVersionSchema = z.object({
-  id: z.string(),
   municipality_id: z.string(),
+  name: z.string().optional(),
+  yomi: z.string().optional(),
   city_code: z.string().default(''),
   subprefecture_code: z.string().default(''),
   county_code: z.string().default(''),
@@ -51,13 +52,47 @@ export interface Municipality {
   versions: MunicipalityVersion[]
 }
 
+// イベントタイプの定義
+export const EVENT_TYPES = [
+  '成立',
+  '新設',
+  '編入',
+  '編入合併',
+  '分立',
+  '市制施行',
+  '町制施行',
+  '区域変更',
+  '名称変更',
+  '属性変更',
+] as const
+
+export type EventType = (typeof EVENT_TYPES)[number]
+
+export interface EventMetadata {
+  birthName: string // 誕生・継続側の表示名
+  extinctionName: string // 消滅・前身側の表示名
+}
+
+export const EVENT_METADATA: Record<EventType, EventMetadata> = {
+  成立: { birthName: '成立', extinctionName: '成立' },
+  新設: { birthName: '新設合併により誕生', extinctionName: '新設合併により消滅' },
+  編入: { birthName: '編入', extinctionName: '編入により消滅' },
+  編入合併: { birthName: '編入合併', extinctionName: '編入合併により消滅' },
+  分立: { birthName: '分立により誕生', extinctionName: '分立' },
+  市制施行: { birthName: '市制施行', extinctionName: '市制施行' },
+  町制施行: { birthName: '町制施行', extinctionName: '町制施行' },
+  区域変更: { birthName: '区域変更', extinctionName: '区域変更' },
+  名称変更: { birthName: '名称変更', extinctionName: '名称変更' },
+  属性変更: { birthName: '属性変更', extinctionName: '属性変更' },
+}
+
 // 廃置分合イベントのスキーマ
 export const ChangeSchema = z.object({
   code: z.string(),
   date: z.string(),
-  event_type: z.string(),
-  city_code_before: z.string(), // 旧来の互換性のため名称は維持（実体はMunicipalityVersion.id）
-  city_code_after: z.string(), // 同上
+  event_type: z.enum(EVENT_TYPES),
+  municipality_id_before: z.string(),
+  municipality_id_after: z.string(),
 })
 
 // 型定義のエクスポート

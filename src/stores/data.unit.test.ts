@@ -45,7 +45,6 @@ describe('DataStore', () => {
 
   const mockNewVersions: MunicipalityVersion[] = [
     {
-      id: '01576_initial',
       municipality_id: 'M001',
       city_code: '01576',
       subprefecture_code: '01013',
@@ -54,7 +53,6 @@ describe('DataStore', () => {
       valid_to: '1972-04-01',
     },
     {
-      id: '01233_19720401',
       municipality_id: 'M002',
       city_code: '01233',
       subprefecture_code: '01013',
@@ -63,7 +61,6 @@ describe('DataStore', () => {
       valid_to: '',
     },
     {
-      id: '01233_20060301',
       municipality_id: 'M002',
       city_code: '01233',
       subprefecture_code: '01013',
@@ -78,8 +75,8 @@ describe('DataStore', () => {
       code: 'event1',
       date: '1972-04-01',
       event_type: '市制施行',
-      city_code_before: '01576_initial',
-      city_code_after: '01233_19720401',
+      municipality_id_before: 'M001',
+      municipality_id_after: 'M002',
     },
   ]
 
@@ -103,7 +100,6 @@ describe('DataStore', () => {
     expect(store.municipalities).toHaveLength(2) // 伊達町, 伊達市
     const dateShi = store.municipalityById.get('M002')
     expect(dateShi?.versions).toHaveLength(2) // 伊達市の2つのバージョンが集約されている
-    expect(store.versionById.get('01576_initial')?.municipality_id).toBe('M001')
   })
 
   it('getCurrentMunicipalitiesが現存する自治体のみを返すこと', async () => {
@@ -140,18 +136,24 @@ describe('DataStore', () => {
   it('getAdjacentEventsが直前・直後のイベントを正しく取得すること', async () => {
     const store = useDataStore()
     store.changes = mockChanges
-    store.eventsByAfter = new Map([['01233_19720401', [mockChanges[0]]]] as [string, Change[]][])
-    store.eventsByBefore = new Map([['01576_initial', [mockChanges[0]]]] as [string, Change[]][])
-    store.versionById = new Map(mockNewVersions.map((v) => [v.id, v]))
+    store.eventsByAfter = new Map([['M002', [mockChanges[0]]]] as [string, Change[]][])
+    store.eventsByBefore = new Map([['M001', [mockChanges[0]]]] as [string, Change[]][])
+    store.municipalityById = new Map([
+      ['M001', { ...mockNewMunicipalities[0]!, versions: [mockNewVersions[0]!] }],
+      [
+        'M002',
+        { ...mockNewMunicipalities[1]!, versions: [mockNewVersions[1]!, mockNewVersions[2]!] },
+      ],
+    ])
     store.loaded = true
 
-    // 伊達町の直後イベント
-    const dateMachiResult = store.getAdjacentEvents('01576_initial')
+    // 伊達町の直後イベント (valid_to: 1972-04-01)
+    const dateMachiResult = store.getAdjacentEvents('M001', mockNewVersions[0]!)
     expect(dateMachiResult.after).toHaveLength(1)
     expect(dateMachiResult.after[0]?.event_type).toBe('市制施行')
 
-    // 伊達市の直前イベント
-    const dateShiResult = store.getAdjacentEvents('01233_19720401')
+    // 伊達市の直前イベント (valid_from: 1972-04-01)
+    const dateShiResult = store.getAdjacentEvents('M002', mockNewVersions[1]!)
     expect(dateShiResult.before).toHaveLength(1)
     expect(dateShiResult.before[0]?.event_type).toBe('市制施行')
   })
@@ -162,7 +164,6 @@ describe('DataStore', () => {
     ]
     const mockTddVersions: MunicipalityVersion[] = [
       {
-        id: '01439_initial',
         municipality_id: 'M001',
         city_code: '01439',
         subprefecture_code: '01012',
@@ -171,7 +172,6 @@ describe('DataStore', () => {
         valid_to: '2010-04-01',
       },
       {
-        id: '01472_20100401',
         municipality_id: 'M001',
         city_code: '01472',
         subprefecture_code: '01002',
@@ -200,11 +200,10 @@ describe('DataStore', () => {
       expect(horokanai?.versions).toHaveLength(2)
 
       // 属性変更の自動検知（支庁が 01012 -> 01002 に変わっている）
-      const adj = store.getAdjacentEvents('01472_20100401')
+      const adj = store.getAdjacentEvents('M001', horokanai!.versions[1]!)
       // change_events.csv は空だが、属性変更が自動生成されて before に入っていることを期待
       expect(adj.before).toHaveLength(1)
       expect(adj.before[0]?.event_type).toBe('属性変更')
-      expect(adj.before[0]?.city_code_before).toBe('01439_initial')
     })
   })
 
@@ -244,6 +243,32 @@ describe('DataStore', () => {
       ).length
 
       expect(tomariCount).toBe(2)
+    })
+  })
+
+  describe('Real Data Search', () => {
+    it('与那城町、桜島町、河内町が検索で見つかること', async () => {
+      const store = useDataStore()
+
+      // 実データをロードするための特殊なモック
+      vi.mocked(fetchCsv).mockImplementation(async (url: string) => {
+        const fileName = url.split('/').pop()
+        if (!fileName) return []
+        const csvPath = path.resolve(process.cwd(), 'public/data', fileName)
+        const csvContent = fs.readFileSync(csvPath, 'utf8')
+        return Papa.parse(csvContent, { header: true, skipEmptyLines: true }).data as any
+      })
+
+      await store.loadAll()
+
+      const yonashiro = store.searchMunicipalities('与那城町')
+      expect(yonashiro.some((m) => m.name === '与那城町')).toBe(true)
+
+      const sakurajima = store.searchMunicipalities('桜島町')
+      expect(sakurajima.some((m) => m.name === '桜島町')).toBe(true)
+
+      const kawachi = store.searchMunicipalities('河内町')
+      expect(kawachi.some((m) => m.name === '河内町' && m.prefecture_code === '43')).toBe(true)
     })
   })
 })

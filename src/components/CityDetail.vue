@@ -2,6 +2,7 @@
 import { ref, nextTick, computed } from 'vue'
 import { format, parseISO } from 'date-fns'
 import { useDataStore } from '@/stores/data'
+import { EVENT_METADATA, type EventType } from '@/types/municipality'
 import type { MunicipalityVersion, Municipality, Change } from '@/types/municipality'
 
 // Props定義
@@ -88,7 +89,7 @@ const extinctionEvent = computed(() => {
   const lastVersion = versions[versions.length - 1]
   if (!lastVersion) return null
 
-  const events = getGroupedEvents(lastVersion.id)
+  const events = getGroupedEvents(props.selectedMunicipality!.id, lastVersion)
   return events.after
 })
 
@@ -105,7 +106,7 @@ const milestones = computed(() => {
 
   // 2. 時系列順に基づいて属性変更や誕生フラグを計算する
   const items = sortedVersions.map((v, index) => {
-    const events = getGroupedEvents(v.id)
+    const events = getGroupedEvents(props.selectedMunicipality!.id, v)
     const prevVersion = index > 0 ? sortedVersions[index - 1] : null
     const attributeChanges = []
 
@@ -149,28 +150,31 @@ interface GroupedEvent {
   event_type: string
   beforeCities: string[]
   afterCities: string[]
-  beforeCityCodes: string[]
-  afterCityCodes: string[]
+  beforeMunicipalityIds: string[]
+  afterMunicipalityIds: string[]
+  beforeDates: string[]
+  afterDates: string[]
 }
 
-// 各バージョンのイベントをキャッシュ
+// 各バージョンのイベントをキャッシュ (キーは municipalityId-valid_from)
 const eventsCache = new Map<string, { before: GroupedEvent | null; after: GroupedEvent | null }>()
 
-const getGroupedEvents = (versionId: string) => {
-  const cached = eventsCache.get(versionId)
+const getGroupedEvents = (municipalityId: string, version: MunicipalityVersion) => {
+  const key = `${municipalityId}-${version.valid_from}`
+  const cached = eventsCache.get(key)
   if (cached) return cached
 
-  const adjacent = dataStore.getAdjacentEvents(versionId)
+  const adjacent = dataStore.getAdjacentEvents(municipalityId, version)
   const result = {
-    before: groupEvents(adjacent.before),
-    after: groupEvents(adjacent.after),
+    before: groupEvents(adjacent.before, true),
+    after: groupEvents(adjacent.after, false),
   }
-  eventsCache.set(versionId, result)
+  eventsCache.set(key, result)
   return result
 }
 
 // イベントをグループ化する関数
-const groupEvents = (events: Change[]) => {
+const groupEvents = (events: Change[], isBefore: boolean) => {
   try {
     if (!events || events.length === 0) return null
 
@@ -179,7 +183,9 @@ const groupEvents = (events: Change[]) => {
     for (const event of events) {
       if (!event || !event.date || !event.event_type) continue
 
-      const key = `${event.date}-${event.event_type}-${event.city_code_after}`
+      // 自治体IDと日付をキーにする
+      const targetMId = isBefore ? event.municipality_id_after : event.municipality_id_before
+      const key = `${event.date}-${event.event_type}-${targetMId}`
 
       if (!groups.has(key)) {
         groups.set(key, {
@@ -187,30 +193,35 @@ const groupEvents = (events: Change[]) => {
           event_type: event.event_type,
           beforeCities: [],
           afterCities: [],
-          beforeCityCodes: [],
-          afterCityCodes: [],
+          beforeMunicipalityIds: [],
+          afterMunicipalityIds: [],
+          beforeDates: [],
+          afterDates: [],
         })
       }
 
       const group = groups.get(key)!
-      const beforeCityData = dataStore.versionById.get(event.city_code_before)
-      const beforeCity = getCityNameByCode(event.city_code_before)
-      const afterCity = getCityNameByCode(event.city_code_after)
+      const bMId = event.municipality_id_before
+      const aMId = event.municipality_id_after
 
-      // 管轄変更や境界変更の場合は、名称が同じでも表示に含める（変化を辿りやすくするため）
-      // 名称そのものを比較する。マスターIDが同じなら「自分自身」とみなす
-      const isSelf =
-        props.selectedMunicipality &&
-        beforeCityData?.municipality_id === props.selectedMunicipality.id
+      const beforeCity = getCityNameByIdAndDate(bMId, event.date, true)
+      const afterCity = getCityNameByIdAndDate(aMId, event.date, false)
 
-      if (beforeCity && !isSelf && !group.beforeCityCodes.includes(event.city_code_before)) {
+      // マスターIDが同じなら「自分自身」とみなす
+      const isSelf = props.selectedMunicipality && bMId === props.selectedMunicipality.id
+      const isNameChange = event.event_type === '名称変更'
+
+      // 名称変更の場合は、自分自身であっても表示に含める（旧字体などの変化を示すため）
+      if (beforeCity && (!isSelf || isNameChange) && !group.beforeMunicipalityIds.includes(bMId)) {
         group.beforeCities.push(beforeCity)
-        group.beforeCityCodes.push(event.city_code_before)
+        group.beforeMunicipalityIds.push(bMId)
+        group.beforeDates.push(event.date)
       }
 
-      if (afterCity && !group.afterCityCodes.includes(event.city_code_after)) {
+      if (afterCity && !group.afterMunicipalityIds.includes(aMId)) {
         group.afterCities.push(afterCity)
-        group.afterCityCodes.push(event.city_code_after)
+        group.afterMunicipalityIds.push(aMId)
+        group.afterDates.push(event.date)
       }
     }
 
@@ -221,36 +232,47 @@ const groupEvents = (events: Change[]) => {
   }
 }
 
-// バージョンIDから市区町村（の特定バージョン）を選択
-const selectCityByCode = async (versionId: string) => {
-  const v = dataStore.versionById.get(versionId)
-  if (v) {
-    emit('citySelected', v)
+// 自治体IDと日付から、該当するバージョンの名前を取得
+const getCityNameByIdAndDate = (mId: string, date: string, isEnd: boolean) => {
+  const m = dataStore.municipalityById.get(mId)
+  if (!m) return `不明な自治体 (${mId})`
 
-    await nextTick()
-    if (detailContainer.value) {
-      detailContainer.value.scrollIntoView({ behavior: 'smooth' })
-    }
-  }
-}
-
-// バージョンIDから名前を取得
-const getCityNameByCode = (versionId: string) => {
-  const v = dataStore.versionById.get(versionId)
-  if (!v) return `不明なバージョン (${versionId})`
-
-  const m = dataStore.municipalityById.get(v.municipality_id)
-  if (!m) return `不明な自治体 (${v.municipality_id})`
+  // 日付に一致するバージョンを探す
+  // isEnd=true の場合、その日に「消滅」したバージョンを探す
+  // isEnd=false の場合、その日に「誕生」したバージョンを探す
+  const version = m.versions.find((v) => (isEnd ? v.valid_to === date : v.valid_from === date))
 
   const pref = dataStore.prefByCode.get(m.prefecture_code)
-  const county = dataStore.countyByCode.get(v.county_code)
+  const county = version ? dataStore.countyByCode.get(version.county_code) : null
 
   let name = ''
   if (pref?.name) name += pref.name + ' '
   if (county?.name) name += county.name + ' '
-  name += m.name
+
+  // バージョン固有の名称があればそれを使用し、なければマスターの名称を使用する
+  name += version?.name || m.name
 
   return name
+}
+
+// 自治体を選択
+const selectCityByIdAndDate = async (mId: string, date: string, isStart: boolean) => {
+  const m = dataStore.municipalityById.get(mId)
+  if (m) {
+    // 指定した日付に開始(isStart=true)または終了(isStart=false)するバージョンを探す
+    const v = m.versions.find((v) => (isStart ? v.valid_from === date : v.valid_to === date))
+    if (v) {
+      emit('citySelected', v)
+
+      await nextTick()
+      if (detailContainer.value) {
+        detailContainer.value.scrollIntoView({ behavior: 'smooth' })
+      }
+    } else if (m.versions.length > 0) {
+      // 該当するバージョンがなくても、とりあえず最新のバージョンを表示する（フォールバック）
+      emit('citySelected', m.versions[m.versions.length - 1]!)
+    }
+  }
 }
 
 // 日付フォーマット
@@ -265,6 +287,13 @@ const formatDate = (dateStr: string) => {
 // WikipediaのURLを生成
 const getWikipediaUrl = (name: string) => {
   return `https://ja.wikipedia.org/wiki/${encodeURIComponent(name.trim())}`
+}
+
+// イベントの表示名を取得
+const getEventDisplayName = (type: string, isBirth: boolean) => {
+  const metadata = EVENT_METADATA[type as EventType]
+  if (!metadata) return type
+  return isBirth ? metadata.birthName : metadata.extinctionName
 }
 </script>
 
@@ -338,7 +367,7 @@ const getWikipediaUrl = (name: string) => {
             {{ formatDate(extinctionEvent.date) }}
           </div>
           <div class="font-semibold text-slate-700 mb-1">
-            {{ extinctionEvent.event_type }}
+            {{ getEventDisplayName(extinctionEvent.event_type, false) }}
           </div>
           <div class="space-y-2 mt-2">
             <div
@@ -346,8 +375,13 @@ const getWikipediaUrl = (name: string) => {
               :key="idx"
               class="block p-3 rounded-lg border border-slate-200 bg-slate-50 hover:bg-white hover:border-blue-300 hover:shadow-sm transition-all cursor-pointer text-xs text-slate-700 font-medium"
               @click="
-                extinctionEvent.afterCityCodes[idx] &&
-                selectCityByCode(extinctionEvent.afterCityCodes[idx])
+                extinctionEvent.afterMunicipalityIds[idx] &&
+                extinctionEvent.afterDates[idx] &&
+                selectCityByIdAndDate(
+                  extinctionEvent.afterMunicipalityIds[idx],
+                  extinctionEvent.afterDates[idx]!,
+                  true,
+                )
               "
             >
               {{ name }}
@@ -359,7 +393,7 @@ const getWikipediaUrl = (name: string) => {
       <!-- イベントカード (誕生含む) -->
       <div
         v-for="item in milestones"
-        :key="item.version.id"
+        :key="`${selectedMunicipality?.id}-${item.version.valid_from}`"
         class="relative flex items-center justify-start group is-active"
       >
         <!-- ドット -->
@@ -397,7 +431,7 @@ const getWikipediaUrl = (name: string) => {
           <!-- 通常のイベント (合併・編入など) -->
           <div v-else-if="item.beforeEvent" class="mb-4">
             <div class="font-semibold mb-1 text-slate-700">
-              {{ item.beforeEvent.event_type }}
+              {{ getEventDisplayName(item.beforeEvent.event_type, true) }}
             </div>
             <div class="space-y-2 mt-2">
               <div
@@ -405,8 +439,13 @@ const getWikipediaUrl = (name: string) => {
                 :key="idx"
                 class="block p-3 rounded-lg border border-slate-200 bg-slate-50 hover:bg-white hover:border-blue-300 hover:shadow-sm transition-all cursor-pointer text-xs text-slate-700 font-medium"
                 @click="
-                  item.beforeEvent.beforeCityCodes[idx] &&
-                  selectCityByCode(item.beforeEvent.beforeCityCodes[idx])
+                  item.beforeEvent.beforeMunicipalityIds[idx] &&
+                  item.beforeEvent.beforeDates[idx] &&
+                  selectCityByIdAndDate(
+                    item.beforeEvent.beforeMunicipalityIds[idx],
+                    item.beforeEvent.beforeDates[idx]!,
+                    false,
+                  )
                 "
               >
                 {{ name }}
