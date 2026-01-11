@@ -15,6 +15,7 @@ export async function fetchCsv(path: string): Promise<Record<string, string>[]> 
   const parsed = Papa.parse<Record<string, string>>(text, {
     header: true,
     skipEmptyLines: true,
+    transformHeader: (header: string) => header.trim(),
   })
 
   // パースエラーがある場合は警告を表示

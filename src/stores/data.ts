@@ -79,7 +79,15 @@ export const useDataStore = defineStore('data', {
         this.counties = countiesRaw.map((r) => CountySchema.parse(r))
         const mMasters = municipalitiesRaw.map((r) => MunicipalitySchema.parse(r))
         this.municipalityVersions = versionsRaw.map((r) => MunicipalityVersionSchema.parse(r))
-        this.changes = changesRaw.map((r) => ChangeSchema.parse(r))
+
+        this.changes = changesRaw.map((r, i) => {
+          try {
+            return ChangeSchema.parse(r)
+          } catch (e) {
+            console.error(`Error parsing change_events.csv at index ${i}:`, r)
+            throw e
+          }
+        })
 
         // インデックスを構築
         this.prefByCode = new Map(this.prefs.map((p) => [p.code, p]))
