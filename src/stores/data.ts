@@ -23,6 +23,7 @@ export const useDataStore = defineStore('data', {
     changes: [] as Change[],
     cityByCode: new Map<string, City>(),
     municipalityById: new Map<string, Municipality>(),
+    cityCodeToRepresentativeCode: new Map<string, string>(),
     eventsByAfter: new Map<string, Change[]>(),
     eventsByBefore: new Map<string, Change[]>(),
     prefByCode: new Map<string, Pref>(),
@@ -111,6 +112,7 @@ export const useDataStore = defineStore('data', {
         ])) {
           finalAliasMap.set(code, findRepresentative(code))
         }
+        this.cityCodeToRepresentativeCode = finalAliasMap
 
         // 自治体エンティティの集約
         const mMap = new Map<string, Municipality>()
@@ -187,6 +189,7 @@ export const useDataStore = defineStore('data', {
       this.changes = []
       this.cityByCode = new Map()
       this.municipalityById = new Map()
+      this.cityCodeToRepresentativeCode = new Map()
       this.subprefByCode = new Map()
       this.eventsByAfter = new Map()
       this.eventsByBefore = new Map()

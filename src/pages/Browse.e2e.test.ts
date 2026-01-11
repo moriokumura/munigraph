@@ -90,4 +90,65 @@ test.describe('Munigraph E2E', () => {
     await expect(page.locator('text=鳳至郡 → 鳳珠郡')).toBeVisible()
     await expect(page.locator('text=管轄変更')).toBeVisible()
   })
+
+  test('自治体を選択するとURLが更新され、ブラウザバックで戻ることができる', async ({ page }) => {
+    await page.goto('./#/browse')
+
+    // 1. 札幌市を検索して選択
+    const searchInput = page.locator('input[placeholder*="検索"]')
+    await searchInput.fill('札幌市')
+    await page.click('text=札幌市')
+
+    // URLに id パラメータが含まれていることを確認
+    await expect(page).toHaveURL(/.*id=01201-%E6%9C%AD%E5%B9%8C%E5%B8%82/)
+
+    // 2. 旭川市を検索して選択
+    await searchInput.fill('旭川市')
+    await page.click('text=旭川市')
+
+    // URLが旭川市のIDに更新されていることを確認
+    await expect(page).toHaveURL(/.*id=01204-%E6%97%AD%E5%B7%9D%E5%B8%82/)
+
+    // 3. ブラウザの「戻る」を実行
+    await page.goBack()
+
+    // URLが札幌市のIDに戻っていることを確認
+    await expect(page).toHaveURL(/.*id=01201-%E6%9C%AD%E5%B9%8C%E5%B8%82/)
+    // 詳細画面も札幌市になっていることを確認
+    await expect(page.locator('h3').filter({ hasText: '札幌市' })).toBeVisible()
+  })
+
+  test('URLのクエリパラメータから直接自治体を表示できる', async ({ page }) => {
+    // 札幌市のIDを指定して直接アクセス
+    await page.goto('./#/browse?id=01201-札幌市')
+
+    // 最初から札幌市の詳細が表示されていることを確認
+    await expect(page.locator('h3').filter({ hasText: '札幌市' })).toBeVisible()
+  })
+
+  test('モバイル端末で自治体を選択した際、詳細エリアへ自動スクロールする', async ({ page }) => {
+    // 画面幅をモバイルサイズに設定
+    await page.setViewportSize({ width: 375, height: 667 })
+    await page.goto('./#/browse')
+
+    // 札幌市を検索
+    const searchInput = page.locator('input[placeholder*="検索"]')
+    await searchInput.fill('札幌市')
+
+    // 選択前のスクロール位置を確認（通常、上部にあるはず）
+    const initialScrollY = await page.evaluate(() => window.scrollY)
+
+    // 札幌市を選択
+    await page.click('text=札幌市')
+
+    // スクロールが発生するのを待機（smooth scrollのため少し待つ）
+    await page.waitForTimeout(1000)
+
+    // スクロール位置が変化していることを確認
+    const finalScrollY = await page.evaluate(() => window.scrollY)
+    expect(finalScrollY).toBeGreaterThan(initialScrollY)
+
+    // 詳細画面が表示されていることを確認
+    await expect(page.locator('h3').filter({ hasText: '札幌市' })).toBeInViewport()
+  })
 })

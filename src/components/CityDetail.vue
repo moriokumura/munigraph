@@ -1,5 +1,5 @@
 <template>
-  <div v-if="selectedMunicipality" ref="detailContainer" class="mt-8 border-t pt-6">
+  <div v-if="selectedMunicipality" ref="detailContainer" class="mt-8 pt-6 px-4 md:px-12 lg:px-24">
     <!-- 自治体名表示 -->
     <div class="mb-8">
       <div class="flex items-center gap-3 mb-2">
@@ -29,23 +29,20 @@
 
     <!-- タイムライン表示 -->
     <div
-      class="space-y-8 relative before:absolute before:inset-x-0 before:top-5 before:bottom-5 before:ml-5 before:-translate-x-px md:before:mx-auto md:before:translate-x-0 before:w-0.5 before:bg-slate-200"
+      class="space-y-8 relative before:absolute before:inset-x-0 before:top-5 before:bottom-5 before:ml-5 before:-translate-x-px before:w-0.5 before:bg-slate-200"
     >
       <!-- 現在マーカー -->
-      <div
-        v-if="isExisting"
-        class="relative flex items-center justify-between md:justify-normal md:odd:flex-row-reverse group is-active"
-      >
+      <div v-if="isExisting" class="relative flex items-center justify-start group is-active">
         <!-- ドット -->
         <div
-          class="flex items-center justify-center w-10 h-10 rounded-full border border-white bg-blue-600 text-white shadow shrink-0 md:order-1 md:group-odd:-translate-x-1/2 md:group-even:translate-x-1/2 z-10"
+          class="flex items-center justify-center w-10 h-10 rounded-full border border-white bg-blue-600 text-white shadow shrink-0 z-10"
         >
           <svg class="w-5 h-5" fill="currentColor" viewBox="0 0 24 24">
             <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2z" />
           </svg>
         </div>
         <!-- ラベル -->
-        <div class="w-[calc(100%-4rem)] md:w-[calc(50%-2.5rem)] px-4">
+        <div class="flex-1 max-w-xl px-4">
           <div class="font-bold text-xl">現在</div>
         </div>
       </div>
@@ -53,11 +50,11 @@
       <!-- 消滅イベントマーカー -->
       <div
         v-if="!isExisting && extinctionEvent"
-        class="relative flex items-center justify-between md:justify-normal md:odd:flex-row-reverse group is-active"
+        class="relative flex items-center justify-start group is-active"
       >
         <!-- ドット -->
         <div
-          class="flex items-center justify-center w-10 h-10 rounded-full border border-white bg-slate-400 text-white shadow shrink-0 md:order-1 md:group-odd:-translate-x-1/2 md:group-even:translate-x-1/2 z-10"
+          class="flex items-center justify-center w-10 h-10 rounded-full border border-white bg-slate-400 text-white shadow shrink-0 z-10"
         >
           <svg class="w-5 h-5" fill="currentColor" viewBox="0 0 24 24">
             <path
@@ -66,9 +63,7 @@
           </svg>
         </div>
         <!-- カード -->
-        <div
-          class="w-[calc(100%-4rem)] md:w-[calc(50%-2.5rem)] bg-white p-4 rounded border border-slate-200 shadow"
-        >
+        <div class="flex-1 max-w-xl bg-white p-4 rounded border border-slate-200 shadow ml-4">
           <div class="font-bold text-lg text-slate-900 mb-2">
             {{ formatDate(extinctionEvent.date) }}
           </div>
@@ -92,11 +87,11 @@
       <div
         v-for="item in milestones"
         :key="item.version.code"
-        class="relative flex items-center justify-between md:justify-normal md:odd:flex-row-reverse group is-active"
+        class="relative flex items-center justify-start group is-active"
       >
         <!-- ドット -->
         <div
-          class="flex items-center justify-center w-10 h-10 rounded-full border border-white shadow shrink-0 md:order-1 md:group-odd:-translate-x-1/2 md:group-even:translate-x-1/2 z-10"
+          class="flex items-center justify-center w-10 h-10 rounded-full border border-white shadow shrink-0 z-10"
           :class="item.isBirth ? 'bg-slate-400 text-white' : 'bg-slate-300 text-white'"
         >
           <!-- 誕生アイコン (Sparkles) -->
@@ -113,9 +108,7 @@
           </svg>
         </div>
         <!-- カード -->
-        <div
-          class="w-[calc(100%-4rem)] md:w-[calc(50%-2.5rem)] bg-white p-4 rounded border border-slate-200 shadow"
-        >
+        <div class="flex-1 max-w-xl bg-white p-4 rounded border border-slate-200 shadow ml-4">
           <div class="font-bold text-lg text-slate-900 mb-2">
             {{
               item.isUnknownBirth

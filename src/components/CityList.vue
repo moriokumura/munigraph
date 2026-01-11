@@ -3,8 +3,8 @@
   <div
     class="flex-1 lg:w-1/2 bg-white border-r border-gray-200 flex flex-col max-h-[calc(100vh-200px)] lg:max-h-[calc(100vh-120px)]"
   >
-    <div class="p-4 border-b border-gray-200 flex-shrink-0">
-      <h3 class="text-lg font-semibold text-gray-900 mb-2">検索結果</h3>
+    <div class="p-4 border-b border-gray-200 flex-shrink-0 flex items-baseline gap-2">
+      <h3 class="text-lg font-semibold text-gray-900">検索結果</h3>
       <div class="text-sm text-gray-600">
         <span class="font-medium text-blue-600">{{ municipalities.length }}</span
         >件

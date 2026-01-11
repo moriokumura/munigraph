@@ -39,7 +39,7 @@
         />
 
         <!-- 自治体詳細 -->
-        <div class="flex-1 lg:w-1/2 bg-white overflow-y-auto">
+        <div ref="detailSection" class="flex-1 lg:w-1/2 bg-white overflow-y-auto">
           <div class="p-4">
             <CityDetail
               :selected-city="selectedCity"
@@ -54,7 +54,8 @@
 </template>
 
 <script setup lang="ts">
-import { ref, onMounted } from 'vue'
+import { ref, onMounted, watch, nextTick } from 'vue'
+import { useRoute, useRouter } from 'vue-router'
 import { useDataStore } from '@/stores/data'
 import type { City, Municipality } from '@/types/municipality'
 import CitySearch from '@/components/CitySearch.vue'
@@ -62,16 +63,48 @@ import CityList from '@/components/CityList.vue'
 import CityDetail from '@/components/CityDetail.vue'
 
 const dataStore = useDataStore()
+const route = useRoute()
+const router = useRouter()
+
 const selectedCity = ref<City | null>(null)
 const selectedMunicipality = ref<Municipality | null>(null)
 const filteredMunicipalities = ref<Municipality[]>([])
+const detailSection = ref<HTMLElement | null>(null)
+
+// 選択状態をURLに同期
+const syncStateToUrl = (municipalityId: string | null) => {
+  if (route.query.id === municipalityId) return
+
+  router.push({
+    query: {
+      ...route.query,
+      id: municipalityId || undefined,
+    },
+  })
+}
+
+// モバイル時に詳細エリアへスクロール
+const scrollToDetailIfNeeded = async () => {
+  if (window.innerWidth < 1024) {
+    await nextTick()
+    detailSection.value?.scrollIntoView({ behavior: 'smooth' })
+  }
+}
 
 // 市区町村（バージョン）選択のハンドラー
 const handleCitySelected = (city: City) => {
   selectedCity.value = city
   // 該当する自治体エンティティも選択状態にする
-  const mId = `${city.city_code}-${city.name}`
-  selectedMunicipality.value = dataStore.municipalityById.get(mId) || null
+  // 管轄変更などでコードが変わっている可能性があるため、代表コードを取得する
+  const repCode = dataStore.cityCodeToRepresentativeCode.get(city.city_code) || city.city_code
+  const mId = `${repCode}-${city.name}`
+  const municipality = dataStore.municipalityById.get(mId) || null
+  selectedMunicipality.value = municipality
+
+  if (municipality) {
+    syncStateToUrl(municipality.id)
+  }
+  scrollToDetailIfNeeded()
 }
 
 // 自治体エンティティ選択のハンドラー
@@ -79,7 +112,33 @@ const handleMunicipalitySelected = (municipality: Municipality) => {
   selectedMunicipality.value = municipality
   // 規定のバージョン（最新または現存）を選択
   selectedCity.value = municipality.versions[municipality.versions.length - 1] || null
+
+  syncStateToUrl(municipality.id)
+  scrollToDetailIfNeeded()
 }
+
+// URLから状態を復元
+const restoreStateFromUrl = () => {
+  const id = route.query.id as string
+  if (id) {
+    const municipality = dataStore.municipalityById.get(id)
+    if (municipality) {
+      selectedMunicipality.value = municipality
+      selectedCity.value = municipality.versions[municipality.versions.length - 1] || null
+    }
+  } else {
+    selectedMunicipality.value = null
+    selectedCity.value = null
+  }
+}
+
+// URL（クエリパラメータ）の変化を監視
+watch(
+  () => route.query.id,
+  () => {
+    restoreStateFromUrl()
+  }
+)
 
 // フィルタリング結果を受け取るハンドラー
 const handleFilteredMunicipalitiesChanged = (municipalities: Municipality[]) => {
@@ -89,5 +148,6 @@ const handleFilteredMunicipalitiesChanged = (municipalities: Municipality[]) => 
 // データを読み込み
 onMounted(async () => {
   await dataStore.loadAll()
+  restoreStateFromUrl()
 })
 </script>
