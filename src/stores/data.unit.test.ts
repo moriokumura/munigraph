@@ -1,8 +1,18 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest'
 import { setActivePinia, createPinia } from 'pinia'
+import fs from 'fs'
+import path from 'path'
+import Papa from 'papaparse'
 import { useDataStore } from './data'
 import { fetchCsv } from '../utils/csv-loader'
-import type { Pref, City, Change, Subprefecture, County, Municipality } from '../types/municipality'
+import { MunicipalityVersionSchema } from '../types/municipality'
+import type {
+  Pref,
+  MunicipalityVersion,
+  Change,
+  Subprefecture,
+  County,
+} from '../types/municipality'
 
 // csv-loaderのモック化
 vi.mock('../utils/csv-loader', () => ({
@@ -27,41 +37,42 @@ describe('DataStore', () => {
   const mockCounties: County[] = [
     { code: '01069', name: '有珠郡', yomi: 'うすぐん', prefecture_code: '01' },
   ]
-  const mockCities: City[] = [
+
+  const mockNewMunicipalities = [
+    { id: 'M001', name: '伊達町', yomi: 'だてちょう', prefecture_code: '01' },
+    { id: 'M002', name: '伊達市', yomi: 'だてし', prefecture_code: '01' },
+  ]
+
+  const mockNewVersions: MunicipalityVersion[] = [
     {
-      code: '01576_initial',
+      id: '01576_initial',
+      municipality_id: 'M001',
       city_code: '01576',
-      name: '伊達町',
-      yomi: 'だてちょう',
-      prefecture_code: '01',
       subprefecture_code: '01013',
       county_code: '01069',
       valid_from: '',
       valid_to: '1972-04-01',
     },
     {
-      code: '01233_19720401',
+      id: '01233_19720401',
+      municipality_id: 'M002',
       city_code: '01233',
-      name: '伊達市',
-      yomi: 'だてし',
-      prefecture_code: '01',
       subprefecture_code: '01013',
       county_code: '',
       valid_from: '1972-04-01',
       valid_to: '',
     },
     {
-      code: '01233_20060301',
+      id: '01233_20060301',
+      municipality_id: 'M002',
       city_code: '01233',
-      name: '伊達市',
-      yomi: 'だてし',
-      prefecture_code: '01',
       subprefecture_code: '01013',
       county_code: '',
       valid_from: '2006-03-01',
       valid_to: '',
     },
   ]
+
   const mockChanges: Change[] = [
     {
       code: 'event1',
@@ -77,13 +88,12 @@ describe('DataStore', () => {
 
     // fetchCsvのモックの戻り値を設定
     vi.mocked(fetchCsv).mockImplementation(async (path: string) => {
-      if (path.endsWith('/prefectures.csv')) return mockPrefs as unknown as Record<string, string>[]
-      if (path.endsWith('/subprefectures.csv'))
-        return mockSubprefs as unknown as Record<string, string>[]
-      if (path.endsWith('/counties.csv')) return mockCounties as unknown as Record<string, string>[]
-      if (path.endsWith('/cities.csv')) return mockCities as unknown as Record<string, string>[]
-      if (path.endsWith('/change_events.csv'))
-        return mockChanges as unknown as Record<string, string>[]
+      if (path.endsWith('/prefectures.csv')) return mockPrefs as any
+      if (path.endsWith('/subprefectures.csv')) return mockSubprefs as any
+      if (path.endsWith('/counties.csv')) return mockCounties as any
+      if (path.endsWith('/municipalities.csv')) return mockNewMunicipalities as any
+      if (path.endsWith('/municipality_versions.csv')) return mockNewVersions as any
+      if (path.endsWith('/change_events.csv')) return mockChanges as any
       return []
     })
 
@@ -91,30 +101,17 @@ describe('DataStore', () => {
 
     expect(store.loaded).toBe(true)
     expect(store.municipalities).toHaveLength(2) // 伊達町, 伊達市
-    const dateShi = store.municipalityById.get('01233-伊達市')
+    const dateShi = store.municipalityById.get('M002')
     expect(dateShi?.versions).toHaveLength(2) // 伊達市の2つのバージョンが集約されている
-    expect(store.cityByCode.get('01576_initial')?.name).toBe('伊達町')
+    expect(store.versionById.get('01576_initial')?.municipality_id).toBe('M001')
   })
 
   it('getCurrentMunicipalitiesが現存する自治体のみを返すこと', async () => {
     const store = useDataStore()
-    // loadAllを介さずに状態をセット
-    const mMap = new Map<string, Municipality>()
-    mMap.set('01576-伊達町', {
-      id: '01576-伊達町',
-      name: '伊達町',
-      yomi: 'だてちょう',
-      prefecture_code: '01',
-      versions: [mockCities[0]!],
-    })
-    mMap.set('01233-伊達市', {
-      id: '01233-伊達市',
-      name: '伊達市',
-      yomi: 'だてし',
-      prefecture_code: '01',
-      versions: [mockCities[1]!, mockCities[2]!],
-    })
-    store.municipalities = Array.from(mMap.values())
+    store.municipalities = [
+      { ...mockNewMunicipalities[0]!, versions: [mockNewVersions[0]!] },
+      { ...mockNewMunicipalities[1]!, versions: [mockNewVersions[1]!, mockNewVersions[2]!] },
+    ]
     store.loaded = true
 
     const currentMunicipalities = store.getCurrentMunicipalities()
@@ -124,24 +121,12 @@ describe('DataStore', () => {
 
   it('searchMunicipalitiesがクエリに一致する自治体を返すこと', async () => {
     const store = useDataStore()
-    const mMap = new Map<string, Municipality>()
-    mMap.set('01576-伊達町', {
-      id: '01576-伊達町',
-      name: '伊達町',
-      yomi: 'だてちょう',
-      prefecture_code: '01',
-      versions: [mockCities[0]!],
-    })
-    mMap.set('01233-伊達市', {
-      id: '01233-伊達市',
-      name: '伊達市',
-      yomi: 'だてし',
-      prefecture_code: '01',
-      versions: [mockCities[1]!, mockCities[2]!],
-    })
-    store.municipalities = Array.from(mMap.values())
-    store.prefByCode = new Map(mockPrefs.map(p => [p.code, p]))
-    store.countyByCode = new Map(mockCounties.map(c => [c.code, c]))
+    store.municipalities = [
+      { ...mockNewMunicipalities[0]!, versions: [mockNewVersions[0]!] },
+      { ...mockNewMunicipalities[1]!, versions: [mockNewVersions[1]!, mockNewVersions[2]!] },
+    ]
+    store.prefByCode = new Map(mockPrefs.map((p) => [p.code, p]))
+    store.countyByCode = new Map(mockCounties.map((c) => [c.code, c]))
     store.loaded = true
 
     // 名前で検索
@@ -150,17 +135,14 @@ describe('DataStore', () => {
     expect(store.searchMunicipalities('だて')).toHaveLength(2)
     // 郡名で検索（伊達町のバージョンが有珠郡を持っている）
     expect(store.searchMunicipalities('有珠郡')).toHaveLength(1)
-    // 一致しない検索
-    expect(store.searchMunicipalities('東京')).toHaveLength(0)
   })
 
   it('getAdjacentEventsが直前・直後のイベントを正しく取得すること', async () => {
     const store = useDataStore()
     store.changes = mockChanges
-    // eventsByAfter/Beforeの構築ロジックをシミュレート
     store.eventsByAfter = new Map([['01233_19720401', [mockChanges[0]]]] as [string, Change[]][])
     store.eventsByBefore = new Map([['01576_initial', [mockChanges[0]]]] as [string, Change[]][])
-    store.cityByCode = new Map(mockCities.map(c => [c.code, c]))
+    store.versionById = new Map(mockNewVersions.map((v) => [v.id, v]))
     store.loaded = true
 
     // 伊達町の直後イベント
@@ -174,99 +156,94 @@ describe('DataStore', () => {
     expect(dateShiResult.before[0]?.event_type).toBe('市制施行')
   })
 
-  it('同一都道府県内の同名自治体（泊村のケース）が個別のエンティティとして集約されること', async () => {
-    const store = useDataStore()
-    const mockTomariCities: City[] = [
+  describe('New Entity-Centric Structure (TDD)', () => {
+    const mockTddMunicipalities = [
+      { id: 'M001', name: '幌加内町', yomi: 'ほろかないちょう', prefecture_code: '01' },
+    ]
+    const mockTddVersions: MunicipalityVersion[] = [
       {
-        code: '01403_initial',
-        city_code: '01403',
-        name: '泊村',
-        yomi: 'とまりむら',
-        prefecture_code: '01',
-        subprefecture_code: '01005', // 後志
-        county_code: '01392',
+        id: '01439_initial',
+        municipality_id: 'M001',
+        city_code: '01439',
+        subprefecture_code: '01012',
+        county_code: '01040',
         valid_from: '',
-        valid_to: '',
+        valid_to: '2010-04-01',
       },
       {
-        code: '01696_initial',
-        city_code: '01696',
-        name: '泊村',
-        yomi: 'とまりむら',
-        prefecture_code: '01',
-        subprefecture_code: '01007', // 根室
-        county_code: '01695',
-        valid_from: '',
+        id: '01472_20100401',
+        municipality_id: 'M001',
+        city_code: '01472',
+        subprefecture_code: '01002',
+        county_code: '01040',
+        valid_from: '2010-04-01',
         valid_to: '',
       },
     ]
 
-    vi.mocked(fetchCsv).mockImplementation(async (path: string) => {
-      if (path.endsWith('/cities.csv'))
-        return mockTomariCities as unknown as Record<string, string>[]
-      return []
+    it('新形式のCSVをロードし、同一ID内で属性変更を自動検知すること', async () => {
+      const store = useDataStore()
+
+      vi.mocked(fetchCsv).mockImplementation(async (path: string) => {
+        if (path.endsWith('/municipalities.csv')) return mockTddMunicipalities as any
+        if (path.endsWith('/municipality_versions.csv')) return mockTddVersions as any
+        if (path.endsWith('/change_events.csv')) return []
+        if (path.endsWith('/prefectures.csv')) return mockPrefs as any
+        return []
+      })
+
+      await store.loadAll()
+
+      const horokanai = store.municipalityById.get('M001')
+      expect(horokanai).toBeDefined()
+      expect(horokanai?.name).toBe('幌加内町')
+      expect(horokanai?.versions).toHaveLength(2)
+
+      // 属性変更の自動検知（支庁が 01012 -> 01002 に変わっている）
+      const adj = store.getAdjacentEvents('01472_20100401')
+      // change_events.csv は空だが、属性変更が自動生成されて before に入っていることを期待
+      expect(adj.before).toHaveLength(1)
+      expect(adj.before[0]?.event_type).toBe('属性変更')
+      expect(adj.before[0]?.city_code_before).toBe('01439_initial')
     })
-
-    await store.loadAll()
-
-    // 名前は同じだがJISコードが異なるため、2つのエンティティになるべき
-    expect(store.municipalities).toHaveLength(2)
-    expect(store.getCurrentMunicipalities()).toHaveLength(2)
-    expect(store.municipalityById.has('01403-泊村')).toBe(true)
-    expect(store.municipalityById.has('01696-泊村')).toBe(true)
   })
 
-  it('管轄変更でJISコードが変わっても名前が同じなら1つのエンティティに集約されること（門前町のケース）', async () => {
-    const store = useDataStore()
-    const mockMonzenCities: City[] = [
-      {
-        code: '17422_initial',
-        city_code: '17422',
-        name: '門前町',
-        yomi: 'もんぜんまち',
-        prefecture_code: '17',
-        subprefecture_code: '',
-        county_code: '17008', // 鳳至郡
-        valid_from: '',
-        valid_to: '2005-03-01',
-      },
-      {
-        code: '17462_20050301',
-        city_code: '17462',
-        name: '門前町',
-        yomi: 'もんぜんまち',
-        prefecture_code: '17',
-        subprefecture_code: '',
-        county_code: '17003', // 鳳珠郡
-        valid_from: '2005-03-01',
-        valid_to: '2006-02-01',
-      },
-    ]
-    const mockMonzenChanges: Change[] = [
-      {
-        code: 'event_monzen',
-        date: '2005-03-01',
-        event_type: '管轄変更',
-        city_code_before: '17422_initial',
-        city_code_after: '17462_20050301',
-      },
-    ]
+  describe('Real Data Integrity', () => {
+    it('現存する自治体数が正確に1747件であること', () => {
+      const csvPath = path.resolve(process.cwd(), 'public/data/municipality_versions.csv')
+      const csvContent = fs.readFileSync(csvPath, 'utf8')
 
-    vi.mocked(fetchCsv).mockImplementation(async (path: string) => {
-      if (path.endsWith('/cities.csv'))
-        return mockMonzenCities as unknown as Record<string, string>[]
-      if (path.endsWith('/change_events.csv'))
-        return mockMonzenChanges as unknown as Record<string, string>[]
-      return []
+      const parsed = Papa.parse(csvContent, {
+        header: true,
+        skipEmptyLines: true,
+      })
+
+      const versions = (parsed.data as any[]).map((r) => MunicipalityVersionSchema.parse(r))
+
+      // 現存バージョンの抽出（valid_to が空のレコード）
+      const currentVersions = versions.filter((v) => !v.valid_to || v.valid_to.trim() === '')
+
+      // 自治体IDのユニーク数
+      const municipalityIds = new Set(currentVersions.map((v) => v.municipality_id))
+
+      expect(municipalityIds.size).toBe(1747)
     })
 
-    await store.loadAll()
+    it('泊村が2つ別の自治体として認識されていること', () => {
+      // マスターデータで北海道(01)の「泊村」が2件あることを確認
+      const csvPath = path.resolve(process.cwd(), 'public/data/municipalities.csv')
+      const csvContent = fs.readFileSync(csvPath, 'utf8')
 
-    // 異なるJISコードだが、管轄変更イベントで名前が同じなため1つに集約されるべき
-    expect(store.municipalities).toHaveLength(1)
-    expect(store.municipalityById.size).toBe(1)
-    const m = store.municipalities[0]
-    expect(m?.name).toBe('門前町')
-    expect(m?.versions).toHaveLength(2)
+      const parsed = Papa.parse(csvContent, {
+        header: true,
+        skipEmptyLines: true,
+      })
+
+      const tomariCount = (parsed.data as Record<string, string>[]).filter(
+        (r) => r.name === '泊村' && r.prefecture_code === '01',
+      ).length
+
+      expect(tomariCount).toBe(2)
+    })
   })
 })

@@ -40,9 +40,21 @@ export default [
       '@typescript-eslint': tseslint,
     },
     rules: {
-      '@typescript-eslint/no-unused-vars': ['warn', { argsIgnorePattern: '^_' }],
-      '@typescript-eslint/no-explicit-any': 'warn',
-      'no-unused-vars': 'off', // TypeScriptのルールを優先
+      '@typescript-eslint/no-unused-vars': ['error', { argsIgnorePattern: '^_' }],
+      '@typescript-eslint/no-explicit-any': 'error',
+      '@typescript-eslint/consistent-type-imports': ['error', { prefer: 'type-imports' }],
+      'no-unused-vars': 'off',
+    },
+  },
+
+  // テストファイル用の緩和ルール
+  {
+    files: ['**/*.test.ts', '**/*.spec.ts', 'src/test/**'],
+    plugins: {
+      '@typescript-eslint': tseslint,
+    },
+    rules: {
+      '@typescript-eslint/no-explicit-any': 'off',
     },
   },
 
@@ -60,11 +72,30 @@ export default [
         sourceType: 'module',
       },
     },
+    plugins: {
+      '@typescript-eslint': tseslint,
+    },
     rules: {
       'vue/multi-word-component-names': 'off',
       'vue/require-default-prop': 'off',
-      'vue/attributes-order': 'warn', // 警告のみ
-      'no-unused-vars': 'off', // Vueの未使用変数は許容
+      'vue/attributes-order': 'warn',
+      'vue/block-order': [
+        'error',
+        {
+          order: ['script', 'template', 'style'],
+        },
+      ],
+      'vue/define-macros-order': [
+        'error',
+        {
+          order: ['defineProps', 'defineEmits', 'defineSlots', 'defineExpose'],
+        },
+      ],
+      'vue/component-api-style': ['error', ['script-setup']],
+      'vue/no-v-html': 'error',
+      '@typescript-eslint/no-explicit-any': 'error',
+      '@typescript-eslint/no-unused-vars': ['error', { argsIgnorePattern: '^_' }],
+      'no-unused-vars': 'off',
     },
   },
 

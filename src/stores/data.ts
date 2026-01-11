@@ -1,11 +1,18 @@
 import { defineStore } from 'pinia'
-import { parse, format } from 'date-fns'
-import type { Pref, Subprefecture, County, City, Change, Municipality } from '@/types/municipality'
+import type {
+  Pref,
+  Subprefecture,
+  County,
+  MunicipalityVersion,
+  Change,
+  Municipality,
+} from '@/types/municipality'
 import {
   PrefSchema,
   SubprefectureSchema,
   CountySchema,
-  CitySchema,
+  MunicipalityVersionSchema,
+  MunicipalitySchema,
   ChangeSchema,
 } from '@/types/municipality'
 import { fetchCsv } from '@/utils/csv-loader'
@@ -18,12 +25,11 @@ export const useDataStore = defineStore('data', {
     prefs: [] as Pref[],
     subprefectures: [] as Subprefecture[],
     counties: [] as County[],
-    cities: [] as City[],
+    municipalityVersions: [] as MunicipalityVersion[],
     municipalities: [] as Municipality[],
     changes: [] as Change[],
-    cityByCode: new Map<string, City>(),
+    versionById: new Map<string, MunicipalityVersion>(),
     municipalityById: new Map<string, Municipality>(),
-    cityCodeToRepresentativeCode: new Map<string, string>(),
     eventsByAfter: new Map<string, Change[]>(),
     eventsByBefore: new Map<string, Change[]>(),
     prefByCode: new Map<string, Pref>(),
@@ -49,7 +55,7 @@ export const useDataStore = defineStore('data', {
       if (this.loading) {
         // ロード完了まで待機
         while (this.loading && !this.loaded) {
-          await new Promise(resolve => setTimeout(resolve, 100))
+          await new Promise((resolve) => setTimeout(resolve, 100))
         }
         return
       }
@@ -59,94 +65,52 @@ export const useDataStore = defineStore('data', {
 
       try {
         const base = import.meta.env.BASE_URL + 'data'
-        const [prefsRaw, subprefsRaw, countiesRaw, citiesRaw, changesRaw] = await Promise.all([
-          fetchCsv(`${base}/prefectures.csv`),
-          fetchCsv(`${base}/subprefectures.csv`),
-          fetchCsv(`${base}/counties.csv`),
-          fetchCsv(`${base}/cities.csv`),
-          fetchCsv(`${base}/change_events.csv`),
-        ])
+        const [prefsRaw, subprefsRaw, countiesRaw, municipalitiesRaw, versionsRaw, changesRaw] =
+          await Promise.all([
+            fetchCsv(`${base}/prefectures.csv`),
+            fetchCsv(`${base}/subprefectures.csv`),
+            fetchCsv(`${base}/counties.csv`),
+            fetchCsv(`${base}/municipalities.csv`),
+            fetchCsv(`${base}/municipality_versions.csv`),
+            fetchCsv(`${base}/change_events.csv`),
+          ])
 
-        this.prefs = prefsRaw.map(r => PrefSchema.parse(r))
-        this.subprefectures = subprefsRaw.map(r => SubprefectureSchema.parse(r))
-        this.counties = countiesRaw.map(r => CountySchema.parse(r))
-        this.cities = citiesRaw.map(r => CitySchema.parse(r))
-        this.changes = changesRaw.map(r => ChangeSchema.parse(r))
+        this.prefs = prefsRaw.map((r) => PrefSchema.parse(r))
+        this.subprefectures = subprefsRaw.map((r) => SubprefectureSchema.parse(r))
+        this.counties = countiesRaw.map((r) => CountySchema.parse(r))
+        const mMasters = municipalitiesRaw.map((r) => MunicipalitySchema.parse(r))
+        this.municipalityVersions = versionsRaw.map((r) => MunicipalityVersionSchema.parse(r))
+        this.changes = changesRaw.map((r) => ChangeSchema.parse(r))
 
         // インデックスを構築
-        this.cityByCode = new Map(this.cities.map(c => [c.code, c]))
-        this.prefByCode = new Map(this.prefs.map(p => [p.code, p]))
-        this.subprefByCode = new Map(this.subprefectures.map(s => [s.code, s]))
-        this.countyByCode = new Map(this.counties.map(c => [c.code, c]))
+        this.versionById = new Map(this.municipalityVersions.map((v) => [v.id, v]))
+        this.prefByCode = new Map(this.prefs.map((p) => [p.code, p]))
+        this.subprefByCode = new Map(this.subprefectures.map((s) => [s.code, s]))
+        this.countyByCode = new Map(this.counties.map((c) => [c.code, c]))
 
-        // 同一自治体とみなすべき city_code のグループ化
-        // 名称変更を伴わない管轄変更などで city_code が変わるケースに対応
-        const codeAliasMap = new Map<string, string>() // city_code -> 代表city_code
-
-        // 再帰的に代表を探す関数
-        const findRepresentative = (code: string): string => {
-          const alias = codeAliasMap.get(code)
-          if (!alias || alias === code) return code
-          return findRepresentative(alias)
-        }
-
-        for (const ev of this.changes) {
-          if (ev.event_type === '管轄変更' || ev.event_type === '境界変更') {
-            const before = this.cityByCode.get(ev.city_code_before)
-            const after = this.cityByCode.get(ev.city_code_after)
-            if (before && after && before.name === after.name) {
-              const repBefore = findRepresentative(before.city_code)
-              const repAfter = findRepresentative(after.city_code)
-              if (repBefore !== repAfter) {
-                codeAliasMap.set(repAfter, repBefore)
-              }
-            }
-          }
-        }
-
-        // 全てのエイリアスを最終的な代表コードに向ける
-        const finalAliasMap = new Map<string, string>()
-        for (const code of new Set([
-          ...codeAliasMap.keys(),
-          ...this.cities.map(c => c.city_code),
-        ])) {
-          finalAliasMap.set(code, findRepresentative(code))
-        }
-        this.cityCodeToRepresentativeCode = finalAliasMap
-
-        // 自治体エンティティの集約
+        // 自治体エンティティの構築
         const mMap = new Map<string, Municipality>()
-        for (const city of this.cities) {
-          // 名前が空のレコードはスキップ（データクレンジング）
-          if (!city.name || city.name.trim() === '') continue
-
-          // 代表となる city_code を取得
-          const representativeCode = finalAliasMap.get(city.city_code) || city.city_code
-          const mId = `${representativeCode}-${city.name}`
-
-          if (!mMap.has(mId)) {
-            mMap.set(mId, {
-              id: mId,
-              name: city.name,
-              yomi: city.yomi,
-              prefecture_code: city.prefecture_code,
-              versions: [],
-            })
-          }
-          mMap.get(mId)!.versions.push(city)
+        for (const m of mMasters) {
+          mMap.set(m.id, {
+            ...m,
+            versions: [],
+          })
         }
 
-        // 各自治体のバージョンを日付順にソートし、最新の読みを反映
+        for (const v of this.municipalityVersions) {
+          const m = mMap.get(v.municipality_id)
+          if (m) {
+            m.versions.push(v)
+          }
+        }
+
+        // バージョンを日付順にソート
         for (const m of mMap.values()) {
           m.versions.sort((a, b) => {
             const dateA = a.valid_from || '0000-00-00'
             const dateB = b.valid_from || '0000-00-00'
             return dateA.localeCompare(dateB)
           })
-          const latest = m.versions[m.versions.length - 1]
-          if (latest) {
-            m.yomi = latest.yomi
-          }
         }
 
         this.municipalities = Array.from(mMap.values())
@@ -184,16 +148,15 @@ export const useDataStore = defineStore('data', {
       this.prefs = []
       this.subprefectures = []
       this.counties = []
-      this.cities = []
+      this.municipalityVersions = []
       this.municipalities = []
       this.changes = []
-      this.cityByCode = new Map()
+      this.versionById = new Map()
       this.municipalityById = new Map()
-      this.cityCodeToRepresentativeCode = new Map()
-      this.subprefByCode = new Map()
       this.eventsByAfter = new Map()
       this.eventsByBefore = new Map()
       this.prefByCode = new Map()
+      this.subprefByCode = new Map()
       this.countyByCode = new Map()
     },
 
@@ -205,7 +168,9 @@ export const useDataStore = defineStore('data', {
      * 現存の自治体エンティティを取得
      */
     getCurrentMunicipalities() {
-      return this.municipalities.filter(m => m.versions.some(v => !v.valid_to || v.valid_to === ''))
+      return this.municipalities.filter((m) =>
+        m.versions.some((v) => !v.valid_to || v.valid_to === ''),
+      )
     },
 
     /**
@@ -218,33 +183,36 @@ export const useDataStore = defineStore('data', {
       }
 
       const lowerQuery = query.toLowerCase()
-      return this.municipalities.filter(m => {
+      return this.municipalities.filter((m) => {
         const cityName = m.name.toLowerCase()
         const cityYomi = m.yomi.toLowerCase()
         const pref = this.prefByCode.get(m.prefecture_code)
         const prefName = pref?.name.toLowerCase() || ''
 
-        // いずれかのバージョンが条件に合致すればOK
-        const matchesQuery =
+        // 名称・読み・都道府県名で検索
+        if (
           cityName.includes(lowerQuery) ||
           cityYomi.includes(lowerQuery) ||
-          prefName.includes(lowerQuery) ||
-          m.versions.some(v => {
-            const county = this.countyByCode.get(v.county_code)
-            const countyName = county?.name.toLowerCase() || ''
-            const countyYomi = county?.yomi.toLowerCase() || ''
-            const subpref = this.subprefByCode.get(v.subprefecture_code)
-            const subprefName = subpref?.name.toLowerCase() || ''
-            const subprefYomi = subpref?.yomi.toLowerCase() || ''
-            return (
-              countyName.includes(lowerQuery) ||
-              countyYomi.includes(lowerQuery) ||
-              subprefName.includes(lowerQuery) ||
-              subprefYomi.includes(lowerQuery)
-            )
-          })
+          prefName.includes(lowerQuery)
+        ) {
+          return true
+        }
 
-        return matchesQuery
+        // 各バージョンに紐づく郡・支庁名で検索
+        return m.versions.some((v) => {
+          const county = this.countyByCode.get(v.county_code)
+          const countyName = county?.name.toLowerCase() || ''
+          const countyYomi = county?.yomi.toLowerCase() || ''
+          const subpref = this.subprefByCode.get(v.subprefecture_code)
+          const subprefName = subpref?.name.toLowerCase() || ''
+          const subprefYomi = subpref?.yomi.toLowerCase() || ''
+          return (
+            countyName.includes(lowerQuery) ||
+            countyYomi.includes(lowerQuery) ||
+            subprefName.includes(lowerQuery) ||
+            subprefYomi.includes(lowerQuery)
+          )
+        })
       })
     },
 
@@ -253,339 +221,66 @@ export const useDataStore = defineStore('data', {
     // ========================================
 
     /**
-     * 市制施行・町制施行のような変更を検出
-     * @param cityCode 市区町村コード
-     */
-    getMunicipalStatusChanges(cityCode: string): Change[] {
-      const events: Change[] = []
-      const city = this.cityByCode.get(cityCode)
-      if (!city) return events
-
-      // 同じ都道府県で同じ名前（読み仮名も考慮）の市区町村を探す
-      const similarCities = this.cities.filter(
-        c =>
-          c.prefecture_code === city.prefecture_code &&
-          c.code !== cityCode &&
-          (c.name === city.name || (c.yomi && city.yomi && c.yomi === city.yomi))
-      )
-
-      for (const similarCity of similarCities) {
-        // 市制施行: 町→市
-        if (city.name.endsWith('市') && similarCity.name.endsWith('町')) {
-          const event: Change = {
-            code: `status_${cityCode}_${similarCity.code}`,
-            date: '2000-01-01', // 仮の日付
-            event_type: '市制施行',
-            city_code_before: similarCity.code,
-            city_code_after: cityCode,
-          }
-          events.push(event)
-        }
-        // 町制施行: 村→町
-        else if (city.name.endsWith('町') && similarCity.name.endsWith('村')) {
-          const event: Change = {
-            code: `status_${cityCode}_${similarCity.code}`,
-            date: '2000-01-01', // 仮の日付
-            event_type: '町制施行',
-            city_code_before: similarCity.code,
-            city_code_after: cityCode,
-          }
-          events.push(event)
-        }
-      }
-
-      return events
-    },
-
-    /**
      * 市区町村の直前と直後のイベントを取得
-     * - 直前イベント: この市区町村が新設されたイベント
-     * - 直後イベント: この市区町村が変化・消滅したイベント
-     * @param cityCode 市区町村コード
+     * @param versionId バージョンID
      */
-    getAdjacentEvents(cityCode: string): { before: Change[]; after: Change[] } {
-      // 直前のイベント: この市区町村が変化後となったイベント（新設されたイベント）
-      const afterEvents = this.eventsByAfter.get(cityCode) || []
+    getAdjacentEvents(versionId: string): { before: Change[]; after: Change[] } {
+      const version = this.versionById.get(versionId)
+      if (!version) return { before: [], after: [] }
 
-      // 最新の日付のイベントを取得（複数ある場合は最新のもの）
-      const sortedAfterEvents = [...afterEvents].sort((a, b) => b.date.localeCompare(a.date))
-      const latestDate = sortedAfterEvents.length > 0 ? sortedAfterEvents[0]!.date : null
+      // 1. CSVに記述された明示的なイベントを取得
+      const beforeEvents = [...(this.eventsByAfter.get(versionId) || [])]
+      const afterEvents = [...(this.eventsByBefore.get(versionId) || [])]
 
-      const beforeEvents = latestDate ? afterEvents.filter(e => e.date === latestDate) : []
+      // 2. 同一自治体内での属性変更を自動検知
+      const municipality = this.municipalityById.get(version.municipality_id)
+      if (municipality) {
+        const vIndex = municipality.versions.findIndex((v) => v.id === versionId)
+        if (vIndex > 0) {
+          const prevVersion = municipality.versions[vIndex - 1]!
+          // 前のバージョンとの間に明示的なイベントがない場合、属性変更イベントを生成
+          if (beforeEvents.length === 0) {
+            const hasAttributeChange =
+              prevVersion.city_code !== version.city_code ||
+              prevVersion.subprefecture_code !== version.subprefecture_code ||
+              prevVersion.county_code !== version.county_code
 
-      // 直後のイベントを探す
-      const beforeEventsAll = this.eventsByBefore.get(cityCode) || []
-      const codeParts = cityCode.split('_')
-      const codeDate = codeParts.length > 1 ? codeParts[1] : null
-
-      let filteredBeforeEvents = beforeEventsAll
-
-      if (codeDate && codeDate !== 'initial') {
-        // 時期別コード（例：20201_20050101）の場合
-        // コードの日付より後のイベントのみを取得（時系列の整合性を保つ）
-        const codeDateStr = format(parse(codeDate, 'yyyyMMdd', new Date()), 'yyyy-MM-dd')
-
-        filteredBeforeEvents = beforeEventsAll.filter(e => e.date > codeDateStr)
-      } else if (codeDate === 'initial') {
-        // initialコード（例：20581_initial）の場合
-        // この自治体が消滅するイベントを取得
-        const sortedBeforeEvents = [...beforeEventsAll].sort((a, b) => b.date.localeCompare(a.date))
-        const latestBeforeDate = sortedBeforeEvents.length > 0 ? sortedBeforeEvents[0]!.date : null
-
-        if (latestBeforeDate) {
-          const latestBeforeEvents = beforeEventsAll.filter(e => e.date === latestBeforeDate)
-          const sameDateAfterCode = latestBeforeEvents[0]?.city_code_after
-
-          if (sameDateAfterCode) {
-            // 同じ日付・同じ変化後自治体のすべてのイベントを取得
-            const additionalEvents = this.eventsByAfter.get(sameDateAfterCode) || []
-            filteredBeforeEvents = additionalEvents.filter(
-              (e: Change) => e.date === latestBeforeDate
-            )
-          }
-        }
-      }
-
-      // この市区町村の次のバージョンが変化後となったイベントを探す
-      // 例：20201_20050101 の場合、20201_20100101 が変化後となったイベント
-      const baseCode = codeParts[0]
-      const futureAfterEvents: Change[] = []
-
-      if (codeDate && codeDate !== 'initial') {
-        const codeDateStr = format(parse(codeDate, 'yyyyMMdd', new Date()), 'yyyy-MM-dd')
-
-        // 同じベースコードでより新しい日付のイベントを検索
-        for (const [eventCode, events] of this.eventsByAfter.entries()) {
-          if (eventCode.startsWith(baseCode + '_')) {
-            for (const event of events) {
-              if (event.date > codeDateStr) {
-                // 同じ日付・同じ変化後自治体のすべてのイベントを取得
-                const sameDateAfterCode = event.city_code_after
-                const additionalEvents = this.eventsByAfter.get(sameDateAfterCode) || []
-                const sameDateEvents = additionalEvents.filter((e: Change) => e.date === event.date)
-                futureAfterEvents.push(...sameDateEvents)
-                break
-              }
+            if (hasAttributeChange) {
+              beforeEvents.push({
+                code: `auto_attr_${versionId}`,
+                date: version.valid_from,
+                event_type: '属性変更',
+                city_code_before: prevVersion.id,
+                city_code_after: version.id,
+              })
             }
-            if (futureAfterEvents.length > 0) break
           }
         }
       }
 
-      // 消滅イベントと次のバージョンのイベントを結合
-      const allFutureEvents = [...filteredBeforeEvents, ...futureAfterEvents]
-
-      // 最も近い日付のイベントを取得
-      const sortedFutureEvents = [...allFutureEvents].sort((a, b) => a.date.localeCompare(b.date))
-      const earliestDate = sortedFutureEvents.length > 0 ? sortedFutureEvents[0]!.date : null
-
-      const afterEventsResult = earliestDate
-        ? allFutureEvents.filter(e => e.date === earliestDate)
-        : []
-
-      return { before: beforeEvents, after: afterEventsResult }
+      return { before: beforeEvents, after: afterEvents }
     },
 
     /**
      * 市区町村の祖先イベントを取得（時系列順）
-     * @param cityCode 市区町村コード
+     * @param versionId バージョンID
      */
-    getAncestorEvents(cityCode: string): Change[] {
+    getAncestorEvents(versionId: string): Change[] {
       const events: Change[] = []
-      const processedCodes = new Set<string>() // 処理済み市区町村コードを記録
+      const processedVersions = new Set<string>()
 
-      // まず、この市区町村が「新設」または「編入」された場合のイベントを取得
-      const afterEvents = this.eventsByAfter.get(cityCode)
+      const collectAncestors = (vId: string) => {
+        if (processedVersions.has(vId)) return
+        processedVersions.add(vId)
 
-      // 市制施行・町制施行の可能性もチェック（町→市、村→町の変化）
-      const statusChanges = this.getMunicipalStatusChanges(cityCode)
-
-      if (statusChanges.length > 0) {
-        events.push(...statusChanges)
-        // 市制施行・町制施行の前の自治体の祖先も取得
-        for (const statusChange of statusChanges) {
-          if (!processedCodes.has(statusChange.city_code_before)) {
-            processedCodes.add(statusChange.city_code_before)
-            const ancestorEvents = this.getAncestorEventsRecursive(
-              statusChange.city_code_before,
-              processedCodes
-            )
-            events.push(...ancestorEvents)
-          }
+        const adj = this.getAdjacentEvents(vId)
+        for (const ev of adj.before) {
+          events.push(ev)
+          collectAncestors(ev.city_code_before)
         }
       }
 
-      if (afterEvents && afterEvents.length > 0) {
-        // 同じ日付のイベントをグループ化（合併などで複数の自治体が同時に変化する場合がある）
-        const eventsByDate = new Map<string, Change[]>()
-        for (const event of afterEvents) {
-          if (!eventsByDate.has(event.date)) {
-            eventsByDate.set(event.date, [])
-          }
-          eventsByDate.get(event.date)!.push(event)
-        }
-
-        // 日付順にソートして処理（新しい日付から古い日付へ）
-        const sortedDates = Array.from(eventsByDate.keys()).sort((a, b) => b.localeCompare(a))
-
-        for (const date of sortedDates) {
-          const eventsForDate = eventsByDate.get(date)!
-
-          // 同じ日付のイベントをすべて追加
-          for (const event of eventsForDate) {
-            events.push(event)
-          }
-
-          // この日付のイベントの祖先を再帰的に取得
-          for (const event of eventsForDate) {
-            if (!processedCodes.has(event.city_code_before)) {
-              processedCodes.add(event.city_code_before)
-              const ancestorEvents = this.getAncestorEventsRecursive(
-                event.city_code_before,
-                processedCodes
-              )
-              events.push(...ancestorEvents)
-            }
-          }
-
-          // 最初の日付のイベントのみ処理して終了（直近の変化のみを対象とする）
-          break
-        }
-      }
-
-      return events
-    },
-
-    /**
-     * 再帰的に祖先イベントを取得
-     * @param cityCode 市区町村コード
-     * @param processedCodes 処理済みコードのセット（無限ループ防止）
-     */
-    getAncestorEventsRecursive(cityCode: string, processedCodes: Set<string>): Change[] {
-      const events: Change[] = []
-
-      // この市区町村が「変化前」の場合のイベントを確認
-      const beforeEvents = this.eventsByBefore.get(cityCode)
-
-      if (!beforeEvents || beforeEvents.length === 0) return events
-
-      // 時期別コードの場合、コードのサフィックス（日付部分）を取得
-      // 例: "18201_20050101" → "20050101"
-      const codeParts = cityCode.split('_')
-      const codeDate = codeParts.length > 1 ? codeParts[1] : null
-
-      // コードの日付より前のイベントのみをフィルタリング（時系列の整合性を保つため）
-      let filteredEvents = beforeEvents
-      if (codeDate && codeDate !== 'initial') {
-        // コードの日付をYYYY-MM-DD形式に変換
-        // 例: "20050101" → "2005-01-01"
-        const codeDateStr = format(parse(codeDate, 'yyyyMMdd', new Date()), 'yyyy-MM-dd')
-
-        filteredEvents = beforeEvents.filter(e => e.date <= codeDateStr)
-      }
-
-      if (filteredEvents.length === 0) return events
-
-      // 最新のイベントを取得（日付順）
-      const latestEvent = [...filteredEvents].sort((a, b) => b.date.localeCompare(a.date))[0]
-
-      if (!latestEvent) return events
-
-      events.push(latestEvent)
-
-      // さらに祖先がある場合は再帰的に取得
-      if (!processedCodes.has(latestEvent.city_code_before)) {
-        processedCodes.add(latestEvent.city_code_before)
-        const ancestorEvents = this.getAncestorEventsRecursive(
-          latestEvent.city_code_before,
-          processedCodes
-        )
-        events.push(...ancestorEvents)
-      }
-
-      return events
-    },
-
-    /**
-     * 市区町村の祖先イベントを取得（編入の場合も含む）
-     * 編入イベントの場合、存続自治体のさらに古いイベントも取得する
-     * @param cityCode 市区町村コード
-     */
-    getAncestorEventsWithMergers(cityCode: string): Change[] {
-      const events: Change[] = []
-      const processedEventCodes = new Set<string>()
-      const processedCityCodes = new Set<string>()
-
-      // まず通常の祖先イベントを取得
-      const normalEvents = this.getAncestorEvents(cityCode)
-
-      for (const event of normalEvents) {
-        if (!processedEventCodes.has(event.code)) {
-          processedEventCodes.add(event.code)
-          events.push(event)
-        }
-      }
-
-      // 編入イベントの場合、存続自治体（変化後）のさらに古いイベントも取得
-      for (const event of normalEvents) {
-        if (event.event_type === '編入' && event.city_code_after === cityCode) {
-          if (!processedCityCodes.has(event.city_code_after)) {
-            processedCityCodes.add(event.city_code_after)
-
-            // 存続自治体のこのイベントより古いイベントを取得
-            const olderEvents = this.getSurvivingCityAncestors(event.city_code_after, event.date)
-
-            for (const olderEvent of olderEvents) {
-              if (!processedEventCodes.has(olderEvent.code)) {
-                processedEventCodes.add(olderEvent.code)
-                events.push(olderEvent)
-              }
-            }
-          }
-        }
-      }
-
-      // 日付順にソート
-      return events.sort((a, b) => b.date.localeCompare(a.date))
-    },
-
-    /**
-     * 市区町村コードから、その市区町村が存続自治体となった編入イベントの祖先を取得
-     * このメソッドは、指定されたコードが city_code_before として使用されているイベントを検索する
-     * @param cityCode 市区町村コード
-     * @param fromEventDate この日付より前のイベントのみを取得（オプション）
-     */
-    getSurvivingCityAncestors(cityCode: string, fromEventDate?: string): Change[] {
-      const events: Change[] = []
-      const processedCodes = new Set<string>()
-
-      // このコードが変化前（city_code_before）となっている編入イベントを検索
-      const allBeforeEvents = this.eventsByBefore.get(cityCode) || []
-
-      // fromEventDateが指定されている場合、それより前のイベントのみを取得
-      const beforeEvents = allBeforeEvents.filter(event => {
-        const isCorrectType = event.event_type === '編入'
-        const isBeforeDate = !fromEventDate || event.date < fromEventDate
-        return isCorrectType && isBeforeDate
-      })
-
-      for (const event of beforeEvents) {
-        if (!processedCodes.has(event.code)) {
-          processedCodes.add(event.code)
-          events.push(event)
-
-          // この編入イベントの他の変化前の自治体の祖先も取得
-          if (!processedCodes.has(event.city_code_before)) {
-            processedCodes.add(event.city_code_before)
-            const ancestors = this.getAncestorEventsRecursive(
-              event.city_code_before,
-              processedCodes
-            )
-            events.push(...ancestors)
-          }
-        }
-      }
-
+      collectAncestors(versionId)
       return events.sort((a, b) => b.date.localeCompare(a.date))
     },
   },

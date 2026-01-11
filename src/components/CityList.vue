@@ -1,3 +1,93 @@
+<script setup lang="ts">
+import { format, parseISO } from 'date-fns'
+import { useDataStore } from '@/stores/data'
+import type { MunicipalityVersion, Municipality } from '@/types/municipality'
+
+// Props定義
+interface Props {
+  municipalities: Municipality[]
+  selectedCity?: MunicipalityVersion | null
+}
+
+// Emits定義
+interface Emits {
+  (e: 'municipalitySelected', municipality: Municipality): void
+}
+
+defineProps<Props>()
+const emit = defineEmits<Emits>()
+
+const dataStore = useDataStore()
+
+// 自治体選択
+const selectMunicipality = (municipality: Municipality) => {
+  emit('municipalitySelected', municipality)
+}
+
+// 日付をyyyy/MM/dd形式にフォーマット
+const formatDate = (dateStr: string) => {
+  try {
+    return format(parseISO(dateStr), 'yyyy/MM/dd')
+  } catch (error) {
+    console.error('Error formatting date:', dateStr, error)
+    return dateStr
+  }
+}
+
+// 一覧表示用：都道府県名、郡名、自治体名、読み方、存続期間を返す
+const getMunicipalityDisplayParts = (m: Municipality) => {
+  const pref = dataStore.prefByCode.get(m.prefecture_code)
+
+  // バージョンがない場合のフォールバック
+  if (m.versions.length === 0) {
+    const yomiParts = []
+    if (pref?.yomi) yomiParts.push(pref.yomi)
+    yomiParts.push(m.yomi)
+    return {
+      pref: pref?.name || '',
+      county: '',
+      name: m.name || '',
+      yomi: yomiParts.filter((p) => p && p.trim() !== '').join(' '),
+      period: '',
+    }
+  }
+
+  // 全バージョンの期間を算出
+  const firstVersion = m.versions[0]!
+  const lastVersion = m.versions[m.versions.length - 1]!
+
+  // 最後のバージョンの郡名を取得
+  const county = dataStore.countyByCode.get(lastVersion.county_code)
+
+  const hasValidFrom = firstVersion.valid_from && firstVersion.valid_from.trim() !== ''
+  const hasValidTo = lastVersion.valid_to && lastVersion.valid_to.trim() !== ''
+
+  let period = ''
+  if (!hasValidFrom && !hasValidTo) {
+    period = '現存'
+  } else if (!hasValidFrom && hasValidTo) {
+    period = `〜${formatDate(lastVersion.valid_to)}`
+  } else if (hasValidFrom && !hasValidTo) {
+    period = `${formatDate(firstVersion.valid_from)}〜現存`
+  } else if (hasValidFrom && hasValidTo) {
+    period = `${formatDate(firstVersion.valid_from)}〜${formatDate(lastVersion.valid_to)}`
+  }
+
+  const yomiParts = []
+  if (pref?.yomi) yomiParts.push(pref.yomi)
+  if (county?.yomi) yomiParts.push(county.yomi)
+  yomiParts.push(m.yomi)
+
+  return {
+    pref: pref?.name || '',
+    county: county?.name || '',
+    name: m.name || '',
+    yomi: yomiParts.filter((p) => p && p.trim() !== '').join(' '),
+    period: period,
+  }
+}
+</script>
+
 <template>
   <!-- 自治体一覧 -->
   <div
@@ -54,79 +144,3 @@
     </div>
   </div>
 </template>
-
-<script setup lang="ts">
-import { format, parseISO } from 'date-fns'
-import { useDataStore } from '@/stores/data'
-import type { City, Municipality } from '@/types/municipality'
-
-// Props定義
-interface Props {
-  municipalities: Municipality[]
-  selectedCity?: City | null
-}
-
-// Emits定義
-interface Emits {
-  (e: 'municipalitySelected', municipality: Municipality): void
-}
-
-defineProps<Props>()
-const emit = defineEmits<Emits>()
-
-const dataStore = useDataStore()
-
-// 自治体選択
-const selectMunicipality = (municipality: Municipality) => {
-  emit('municipalitySelected', municipality)
-}
-
-// 日付をyyyy/MM/dd形式にフォーマット
-const formatDate = (dateStr: string) => {
-  try {
-    return format(parseISO(dateStr), 'yyyy/MM/dd')
-  } catch (error) {
-    console.error('Error formatting date:', dateStr, error)
-    return dateStr
-  }
-}
-
-// 一覧表示用：都道府県名、郡名、自治体名、読み方、存続期間を返す
-const getMunicipalityDisplayParts = (m: Municipality) => {
-  const pref = dataStore.prefByCode.get(m.prefecture_code)
-
-  // 全バージョンの期間を算出
-  const firstVersion = m.versions[0]
-  const lastVersion = m.versions[m.versions.length - 1]
-
-  // 最後のバージョンの郡名を取得
-  const county = lastVersion ? dataStore.countyByCode.get(lastVersion.county_code) : null
-
-  const hasValidFrom = firstVersion?.valid_from && firstVersion.valid_from.trim() !== ''
-  const hasValidTo = lastVersion?.valid_to && lastVersion.valid_to.trim() !== ''
-
-  let period = ''
-  if (!hasValidFrom && !hasValidTo) {
-    period = '現存'
-  } else if (!hasValidFrom && hasValidTo) {
-    period = `〜${formatDate(lastVersion.valid_to)}`
-  } else if (hasValidFrom && !hasValidTo) {
-    period = `${formatDate(firstVersion.valid_from)}〜現存`
-  } else if (hasValidFrom && hasValidTo) {
-    period = `${formatDate(firstVersion.valid_from)}〜${formatDate(lastVersion.valid_to)}`
-  }
-
-  const yomiParts = []
-  if (pref?.yomi) yomiParts.push(pref.yomi)
-  if (county?.yomi) yomiParts.push(county.yomi)
-  yomiParts.push(m.yomi)
-
-  return {
-    pref: pref?.name || '',
-    county: county?.name || '',
-    name: m.name || '',
-    yomi: yomiParts.filter(p => p && p.trim() !== '').join(' '),
-    period: period,
-  }
-}
-</script>

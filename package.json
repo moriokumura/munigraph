@@ -13,7 +13,7 @@
     "test:e2e": "playwright test",
     "test:e2e:ui": "playwright test --ui",
     "lint": "vue-tsc -b && npm run eslint && npm run format",
-    "eslint": "eslint . --ext .vue,.js,.jsx,.cjs,.mjs,.ts,.tsx,.cts,.mts --fix",
+    "eslint": "eslint . --fix",
     "format": "prettier --write --log-level warn ."
   },
   "dependencies": {

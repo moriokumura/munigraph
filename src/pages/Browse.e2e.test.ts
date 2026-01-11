@@ -68,7 +68,7 @@ test.describe('Munigraph E2E', () => {
     // 4. タイムラインに支庁変更が表示されているか確認
     // 「空知総合振興局 → 上川総合振興局」というテキストが含まれているはず
     await expect(page.locator('text=空知総合振興局 → 上川総合振興局')).toBeVisible()
-    await expect(page.locator('text=管轄変更')).toBeVisible()
+    await expect(page.locator('text=属性変更')).toBeVisible()
   })
 
   test('門前町の郡名変更とエンティティ集約が正しく機能している', async ({ page }) => {
@@ -88,7 +88,7 @@ test.describe('Munigraph E2E', () => {
 
     // 4. 属性変更「鳳至郡 → 鳳珠郡」が表示されているか確認
     await expect(page.locator('text=鳳至郡 → 鳳珠郡')).toBeVisible()
-    await expect(page.locator('text=管轄変更')).toBeVisible()
+    await expect(page.locator('text=属性変更')).toBeVisible()
   })
 
   test('自治体を選択するとURLが更新され、ブラウザバックで戻ることができる', async ({ page }) => {
@@ -99,28 +99,28 @@ test.describe('Munigraph E2E', () => {
     await searchInput.fill('札幌市')
     await page.click('text=札幌市')
 
-    // URLに id パラメータが含まれていることを確認
-    await expect(page).toHaveURL(/.*id=01201-%E6%9C%AD%E5%B9%8C%E5%B8%82/)
+    // URLに id パラメータが含まれていることを確認 (新形式の ID M00001)
+    await expect(page).toHaveURL(/.*id=M00001/)
 
     // 2. 旭川市を検索して選択
     await searchInput.fill('旭川市')
     await page.click('text=旭川市')
 
-    // URLが旭川市のIDに更新されていることを確認
-    await expect(page).toHaveURL(/.*id=01204-%E6%97%AD%E5%B7%9D%E5%B8%82/)
+    // URLが旭川市のIDに更新されていることを確認 (新形式の ID M00004)
+    await expect(page).toHaveURL(/.*id=M00004/)
 
     // 3. ブラウザの「戻る」を実行
     await page.goBack()
 
     // URLが札幌市のIDに戻っていることを確認
-    await expect(page).toHaveURL(/.*id=01201-%E6%9C%AD%E5%B9%8C%E5%B8%82/)
+    await expect(page).toHaveURL(/.*id=M00001/)
     // 詳細画面も札幌市になっていることを確認
     await expect(page.locator('h3').filter({ hasText: '札幌市' })).toBeVisible()
   })
 
   test('URLのクエリパラメータから直接自治体を表示できる', async ({ page }) => {
-    // 札幌市のIDを指定して直接アクセス
-    await page.goto('./#/browse?id=01201-札幌市')
+    // 札幌市のID（M00001）を指定して直接アクセス
+    await page.goto('./#/browse?id=M00001')
 
     // 最初から札幌市の詳細が表示されていることを確認
     await expect(page.locator('h3').filter({ hasText: '札幌市' })).toBeVisible()

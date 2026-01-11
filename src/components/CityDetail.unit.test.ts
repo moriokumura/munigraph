@@ -2,27 +2,23 @@ import { describe, it, expect } from 'vitest'
 import { mount } from '@vue/test-utils'
 import { createTestingPinia } from '@pinia/testing'
 import CityDetail from './CityDetail.vue'
-import type { City, Municipality } from '@/types/municipality'
+import type { MunicipalityVersion, Municipality } from '@/types/municipality'
 
 describe('CityDetail.vue', () => {
-  const mockCity: City = {
-    code: '01233_19720401',
+  const mockCity: MunicipalityVersion = {
+    id: '01233_19720401',
+    municipality_id: 'M002',
     city_code: '01233',
-    name: '伊達市',
-    yomi: 'だてし',
-    prefecture_code: '01',
     subprefecture_code: '01013',
     county_code: '',
     valid_from: '1972-04-01',
     valid_to: '',
   }
 
-  const mockHistoryCity: City = {
-    code: '01576_initial',
+  const mockHistoryCity: MunicipalityVersion = {
+    id: '01576_initial',
+    municipality_id: 'M001',
     city_code: '01576',
-    name: '伊達町',
-    yomi: 'だてちょう',
-    prefecture_code: '01',
     subprefecture_code: '01013',
     county_code: '01069',
     valid_from: '1900-01-01',
@@ -30,7 +26,7 @@ describe('CityDetail.vue', () => {
   }
 
   const mockMunicipality: Municipality = {
-    id: '01233-伊達市',
+    id: 'M002',
     name: '伊達市',
     yomi: 'だてし',
     prefecture_code: '01',
@@ -42,9 +38,15 @@ describe('CityDetail.vue', () => {
       initialState: {
         data: {
           loaded: true,
-          cityByCode: new Map([[mockCity.code, mockCity]]),
+          versionById: new Map([[mockCity.id, mockCity]]),
+          municipalityById: new Map([[mockMunicipality.id, mockMunicipality]]),
           eventsByAfter: new Map(),
           eventsByBefore: new Map(),
+          prefByCode: new Map([['01', { code: '01', name: '北海道', yomi: 'ほっかいどう' }]]),
+          countyByCode: new Map(),
+          subprefByCode: new Map([
+            ['01013', { code: '01013', name: '胆振総合振興局', yomi: 'いぶり' }],
+          ]),
         },
       },
       stubActions: false,
@@ -60,15 +62,14 @@ describe('CityDetail.vue', () => {
       },
     })
 
-    // イベントなしの初期状態は「日付未登録 / 成立」となる
-    expect(wrapper.text()).toContain('日付未登録')
+    // イベントなしの初期状態は「成立」となる（日付があるので「日付未登録」ではない）
     expect(wrapper.text()).toContain('成立')
     expect(wrapper.text()).toContain('現在')
   })
 
   it('消滅した自治体の情報が表示されること', () => {
     const mockMuniExtinct: Municipality = {
-      id: '01576-伊達町',
+      id: 'M001',
       name: '伊達町',
       yomi: 'だてちょう',
       prefecture_code: '01',
@@ -79,9 +80,15 @@ describe('CityDetail.vue', () => {
       initialState: {
         data: {
           loaded: true,
-          cityByCode: new Map([[mockHistoryCity.code, mockHistoryCity]]),
+          versionById: new Map([[mockHistoryCity.id, mockHistoryCity]]),
+          municipalityById: new Map([[mockMuniExtinct.id, mockMuniExtinct]]),
           eventsByAfter: new Map(),
           eventsByBefore: new Map(),
+          prefByCode: new Map([['01', { code: '01', name: '北海道', yomi: 'ほっかいどう' }]]),
+          countyByCode: new Map([['01069', { code: '01069', name: '有珠郡', yomi: 'うす' }]]),
+          subprefByCode: new Map([
+            ['01013', { code: '01013', name: '胆振総合振興局', yomi: 'いぶり' }],
+          ]),
         },
       },
       stubActions: false,
@@ -98,7 +105,6 @@ describe('CityDetail.vue', () => {
     })
 
     // 最初のバージョン（イベントなし）が表示される
-    expect(wrapper.text()).toContain('日付未登録')
     expect(wrapper.text()).toContain('成立')
     expect(wrapper.text()).not.toContain('現在')
   })
@@ -118,9 +124,22 @@ describe('CityDetail.vue', () => {
         data: {
           loaded: true,
           changes: [mockChange],
-          cityByCode: new Map([
+          versionById: new Map([
             ['01576_initial', mockHistoryCity],
             ['01233_19720401', mockCity],
+          ]),
+          municipalityById: new Map<string, Municipality>([
+            [
+              'M001',
+              {
+                id: 'M001',
+                name: '伊達町',
+                yomi: 'だてちょう',
+                prefecture_code: '01',
+                versions: [],
+              },
+            ],
+            ['M002', mockMunicipality],
           ]),
           eventsByAfter: new Map([['01233_19720401', [mockChange]]]),
           eventsByBefore: new Map([['01576_initial', [mockChange]]]),

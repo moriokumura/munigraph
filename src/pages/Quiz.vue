@@ -1,3 +1,7 @@
+<script setup lang="ts">
+// クイズ機能の実装は今後追加予定
+</script>
+
 <template>
   <main class="min-h-screen bg-gradient-to-br from-purple-50 to-pink-100 py-8">
     <div class="max-w-4xl mx-auto px-4">
@@ -97,7 +101,3 @@
     </div>
   </main>
 </template>
-
-<script setup lang="ts">
-// クイズ機能の実装は今後追加予定
-</script>

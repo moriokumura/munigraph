@@ -23,26 +23,32 @@ export const CountySchema = z.object({
   prefecture_code: z.string(),
 })
 
-// 市区町村のスキーマ
-export const CitySchema = z.object({
-  code: z.string(),
+// 市区町村バージョンのスキーマ（旧City）
+export const MunicipalityVersionSchema = z.object({
+  id: z.string(),
+  municipality_id: z.string(),
   city_code: z.string().default(''),
-  name: z.string(),
-  yomi: z.string().default(''),
-  prefecture_code: z.string(),
   subprefecture_code: z.string().default(''),
   county_code: z.string().default(''),
   valid_from: z.string().default(''),
   valid_to: z.string().default(''),
 })
 
-// 自治体エンティティ（同一名称の全バージョンを集約）
+// 自治体エンティティのスキーマ
+export const MunicipalitySchema = z.object({
+  id: z.string(),
+  name: z.string(),
+  yomi: z.string().default(''),
+  prefecture_code: z.string(),
+})
+
+// 自治体エンティティ（関連する全バージョンを含む）
 export interface Municipality {
-  id: string // prefecture_code-name
+  id: string
   name: string
   yomi: string
   prefecture_code: string
-  versions: City[]
+  versions: MunicipalityVersion[]
 }
 
 // 廃置分合イベントのスキーマ
@@ -50,13 +56,13 @@ export const ChangeSchema = z.object({
   code: z.string(),
   date: z.string(),
   event_type: z.string(),
-  city_code_before: z.string(),
-  city_code_after: z.string(),
+  city_code_before: z.string(), // 旧来の互換性のため名称は維持（実体はMunicipalityVersion.id）
+  city_code_after: z.string(), // 同上
 })
 
 // 型定義のエクスポート
 export type Pref = z.infer<typeof PrefSchema>
 export type Subprefecture = z.infer<typeof SubprefectureSchema>
 export type County = z.infer<typeof CountySchema>
-export type City = z.infer<typeof CitySchema>
+export type MunicipalityVersion = z.infer<typeof MunicipalityVersionSchema>
 export type Change = z.infer<typeof ChangeSchema>

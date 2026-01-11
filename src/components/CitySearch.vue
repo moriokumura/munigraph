@@ -1,3 +1,137 @@
+<script setup lang="ts">
+import { ref, computed, watch } from 'vue'
+import { useDataStore } from '@/stores/data'
+import type { MunicipalityVersion, Municipality } from '@/types/municipality'
+
+// Props定義
+interface Props {
+  selectedCity?: MunicipalityVersion | null
+}
+
+// Emits定義
+interface Emits {
+  (e: 'citySelected', city: MunicipalityVersion): void
+  (e: 'filteredMunicipalitiesChanged', municipalities: Municipality[]): void
+}
+
+defineProps<Props>()
+const emit = defineEmits<Emits>()
+
+const dataStore = useDataStore()
+const searchQuery = ref('')
+
+// 折りたたみ状態
+const isCollapsed = ref(false)
+
+// フィルター設定
+const showExisting = ref(true)
+const showExtinct = ref(true)
+const showCity = ref(true)
+const showTown = ref(true)
+const showVillage = ref(true)
+const showSpecialWard = ref(true)
+const selectedPrefecture = ref('')
+const selectedSubprefecture = ref('')
+const selectedCounty = ref('')
+
+// 選択された都道府県の支庁一覧を取得
+const availableSubprefectures = computed(() => {
+  if (!selectedPrefecture.value) return []
+  return dataStore.subprefectures.filter(
+    (subpref) => subpref.prefecture_code === selectedPrefecture.value,
+  )
+})
+
+// 選択された都道府県の郡一覧を取得
+const availableCounties = computed(() => {
+  if (!selectedPrefecture.value) return []
+  return dataStore.counties.filter((county) => county.prefecture_code === selectedPrefecture.value)
+})
+
+// 都道府県が変更されたときに支庁と郡の選択をリセット
+watch(selectedPrefecture, () => {
+  selectedSubprefecture.value = ''
+  selectedCounty.value = ''
+})
+
+// 折りたたみ状態を切り替え
+const toggleCollapsed = () => {
+  isCollapsed.value = !isCollapsed.value
+}
+
+// すべてのフィルターをリセット
+const resetFilters = () => {
+  showExisting.value = true
+  showExtinct.value = true
+  showCity.value = true
+  showTown.value = true
+  showVillage.value = true
+  showSpecialWard.value = true
+  selectedPrefecture.value = ''
+  selectedSubprefecture.value = ''
+  selectedCounty.value = ''
+  searchQuery.value = ''
+}
+
+// 検索結果を計算（検索クエリとフィルター条件を組み合わせて適用）
+const filteredMunicipalities = computed(() => {
+  if (!dataStore.loaded) return []
+
+  // まず検索クエリで絞り込み
+  let municipalities = dataStore.searchMunicipalities(searchQuery.value)
+
+  // フィルター適用
+  municipalities = municipalities.filter((m) => {
+    // 都道府県フィルター
+    if (selectedPrefecture.value && m.prefecture_code !== selectedPrefecture.value) return false
+
+    // 少なくとも1つのバージョンがフィルター条件を満たせば表示
+    return m.versions.some((v) => {
+      // 現存/消滅フィルター
+      const isExisting = !v.valid_to || v.valid_to.trim() === ''
+      if (isExisting && !showExisting.value) return false
+      if (!isExisting && !showExtinct.value) return false
+
+      // 自治体の種類フィルター (マスターの名前を使用)
+      const cityType = m.name?.endsWith('市')
+        ? 'city'
+        : m.name?.endsWith('町')
+          ? 'town'
+          : m.name?.endsWith('村')
+            ? 'village'
+            : m.name?.endsWith('区')
+              ? 'ward'
+              : null
+
+      if (cityType === 'city' && !showCity.value) return false
+      if (cityType === 'town' && !showTown.value) return false
+      if (cityType === 'village' && !showVillage.value) return false
+      if (cityType === 'ward' && !showSpecialWard.value) return false
+
+      // 支庁フィルター
+      if (selectedSubprefecture.value && v.subprefecture_code !== selectedSubprefecture.value)
+        return false
+
+      // 郡フィルター
+      if (selectedCounty.value && v.county_code !== selectedCounty.value) return false
+
+      return true
+    })
+  })
+
+  return municipalities
+})
+
+// フィルタリング結果を親コンポーネントに通知
+watch(
+  filteredMunicipalities,
+  (newMunicipalities) => {
+    emit('filteredMunicipalitiesChanged', newMunicipalities)
+  },
+  { immediate: true },
+)
+</script>
+
 <template>
   <div>
     <!-- 絞り込みフォーム -->
@@ -224,137 +358,3 @@
     </div>
   </div>
 </template>
-
-<script setup lang="ts">
-import { ref, computed, watch } from 'vue'
-import { useDataStore } from '@/stores/data'
-import type { City, Municipality } from '@/types/municipality'
-
-// Props定義
-interface Props {
-  selectedCity?: City | null
-}
-
-// Emits定義
-interface Emits {
-  (e: 'citySelected', city: City): void
-  (e: 'filteredMunicipalitiesChanged', municipalities: Municipality[]): void
-}
-
-defineProps<Props>()
-const emit = defineEmits<Emits>()
-
-const dataStore = useDataStore()
-const searchQuery = ref('')
-
-// 折りたたみ状態
-const isCollapsed = ref(false)
-
-// フィルター設定
-const showExisting = ref(true)
-const showExtinct = ref(true)
-const showCity = ref(true)
-const showTown = ref(true)
-const showVillage = ref(true)
-const showSpecialWard = ref(true)
-const selectedPrefecture = ref('')
-const selectedSubprefecture = ref('')
-const selectedCounty = ref('')
-
-// 選択された都道府県の支庁一覧を取得
-const availableSubprefectures = computed(() => {
-  if (!selectedPrefecture.value) return []
-  return dataStore.subprefectures.filter(
-    subpref => subpref.prefecture_code === selectedPrefecture.value
-  )
-})
-
-// 選択された都道府県の郡一覧を取得
-const availableCounties = computed(() => {
-  if (!selectedPrefecture.value) return []
-  return dataStore.counties.filter(county => county.prefecture_code === selectedPrefecture.value)
-})
-
-// 都道府県が変更されたときに支庁と郡の選択をリセット
-watch(selectedPrefecture, () => {
-  selectedSubprefecture.value = ''
-  selectedCounty.value = ''
-})
-
-// 折りたたみ状態を切り替え
-const toggleCollapsed = () => {
-  isCollapsed.value = !isCollapsed.value
-}
-
-// すべてのフィルターをリセット
-const resetFilters = () => {
-  showExisting.value = true
-  showExtinct.value = true
-  showCity.value = true
-  showTown.value = true
-  showVillage.value = true
-  showSpecialWard.value = true
-  selectedPrefecture.value = ''
-  selectedSubprefecture.value = ''
-  selectedCounty.value = ''
-  searchQuery.value = ''
-}
-
-// 検索結果を計算（検索クエリとフィルター条件を組み合わせて適用）
-const filteredMunicipalities = computed(() => {
-  if (!dataStore.loaded) return []
-
-  // まず検索クエリで絞り込み
-  let municipalities = dataStore.searchMunicipalities(searchQuery.value)
-
-  // フィルター適用
-  municipalities = municipalities.filter(m => {
-    // 少なくとも1つのバージョンがフィルター条件を満たせば表示
-    return m.versions.some(v => {
-      // 現存/消滅フィルター
-      const isExisting = !v.valid_to || v.valid_to.trim() === ''
-      if (isExisting && !showExisting.value) return false
-      if (!isExisting && !showExtinct.value) return false
-
-      // 自治体の種類フィルター
-      const cityType = v.name?.endsWith('市')
-        ? 'city'
-        : v.name?.endsWith('町')
-          ? 'town'
-          : v.name?.endsWith('村')
-            ? 'village'
-            : v.name?.endsWith('区')
-              ? 'ward'
-              : null
-
-      if (cityType === 'city' && !showCity.value) return false
-      if (cityType === 'town' && !showTown.value) return false
-      if (cityType === 'village' && !showVillage.value) return false
-      if (cityType === 'ward' && !showSpecialWard.value) return false
-
-      // 都道府県フィルター
-      if (selectedPrefecture.value && v.prefecture_code !== selectedPrefecture.value) return false
-
-      // 支庁フィルター
-      if (selectedSubprefecture.value && v.subprefecture_code !== selectedSubprefecture.value)
-        return false
-
-      // 郡フィルター
-      if (selectedCounty.value && v.county_code !== selectedCounty.value) return false
-
-      return true
-    })
-  })
-
-  return municipalities
-})
-
-// フィルタリング結果を親コンポーネントに通知
-watch(
-  filteredMunicipalities,
-  newMunicipalities => {
-    emit('filteredMunicipalitiesChanged', newMunicipalities)
-  },
-  { immediate: true }
-)
-</script>

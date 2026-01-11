@@ -1,3 +1,28 @@
+<script setup lang="ts">
+import { onMounted, ref, nextTick } from 'vue'
+import { useDataStore } from '@/stores/data'
+const store = useDataStore()
+const error = ref<string | null>(null)
+
+onMounted(async () => {
+  console.log('Home component mounted, store state:', {
+    loaded: store.loaded,
+    loading: store.loading,
+    error: store.error,
+  })
+
+  try {
+    // 次のティックまで待機してからデータを読み込み
+    await nextTick()
+    await store.loadAll()
+    console.log('Data loaded successfully in Home component')
+  } catch (err) {
+    console.error('Failed to load data in Home component:', err)
+    error.value = 'データの読み込みに失敗しました'
+  }
+})
+</script>
+
 <template>
   <main class="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 py-8">
     <div class="max-w-4xl mx-auto px-4">
@@ -52,31 +77,6 @@
     </div>
   </main>
 </template>
-
-<script setup lang="ts">
-import { onMounted, ref, nextTick } from 'vue'
-import { useDataStore } from '@/stores/data'
-const store = useDataStore()
-const error = ref<string | null>(null)
-
-onMounted(async () => {
-  console.log('Home component mounted, store state:', {
-    loaded: store.loaded,
-    loading: store.loading,
-    error: store.error,
-  })
-
-  try {
-    // 次のティックまで待機してからデータを読み込み
-    await nextTick()
-    await store.loadAll()
-    console.log('Data loaded successfully in Home component')
-  } catch (err) {
-    console.error('Failed to load data in Home component:', err)
-    error.value = 'データの読み込みに失敗しました'
-  }
-})
-</script>
 
 <style scoped>
 /* Tailwind CSSが適用されているため、追加のスタイルは不要 */

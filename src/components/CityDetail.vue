@@ -1,3 +1,273 @@
+<script setup lang="ts">
+import { ref, nextTick, computed } from 'vue'
+import { format, parseISO } from 'date-fns'
+import { useDataStore } from '@/stores/data'
+import type { MunicipalityVersion, Municipality, Change } from '@/types/municipality'
+
+// Props定義
+interface Props {
+  selectedCity: MunicipalityVersion | null
+  selectedMunicipality: Municipality | null
+}
+
+// Emits定義
+interface Emits {
+  (e: 'citySelected', city: MunicipalityVersion): void
+}
+
+const props = defineProps<Props>()
+const emit = defineEmits<Emits>()
+
+const dataStore = useDataStore()
+const detailContainer = ref<HTMLElement | null>(null)
+
+// 自治体のフルネーム（都道府県名 + [郡名] + 自治体名）
+const fullMunicipalityName = computed(() => {
+  if (!props.selectedMunicipality) return ''
+  const pref = dataStore.prefByCode.get(props.selectedMunicipality.prefecture_code)
+
+  // 最後のバージョンの郡名を取得
+  const lastVersion =
+    props.selectedMunicipality.versions[props.selectedMunicipality.versions.length - 1]
+  const county = lastVersion ? dataStore.countyByCode.get(lastVersion.county_code) : null
+
+  const parts = []
+  if (pref) parts.push(pref.name)
+  if (county) parts.push(county.name)
+  parts.push(props.selectedMunicipality.name)
+
+  return parts.join(' ')
+})
+
+// 自治体のフル読みがな（都道府県読み + [郡読み] + 自治体読み）
+const fullMunicipalityYomi = computed(() => {
+  if (!props.selectedMunicipality) return ''
+  const pref = dataStore.prefByCode.get(props.selectedMunicipality.prefecture_code)
+
+  // 最後のバージョンの郡名を取得
+  const lastVersion =
+    props.selectedMunicipality.versions[props.selectedMunicipality.versions.length - 1]
+  const county = lastVersion ? dataStore.countyByCode.get(lastVersion.county_code) : null
+
+  const parts = []
+  if (pref?.yomi) parts.push(pref.yomi)
+  if (county?.yomi) parts.push(county.yomi)
+  parts.push(props.selectedMunicipality.yomi)
+
+  return parts.join(' ')
+})
+
+// 最新の支庁情報
+const latestSubprefectureInfo = computed(() => {
+  const versions = props.selectedMunicipality?.versions
+  if (!versions || versions.length === 0) return ''
+
+  const lastVersion = versions[versions.length - 1]
+  if (!lastVersion) return ''
+
+  const subpref = dataStore.subprefByCode.get(lastVersion.subprefecture_code)
+  if (!subpref?.name) return ''
+  return subpref.yomi && subpref.yomi.trim() !== ''
+    ? `${subpref.name} (${subpref.yomi})`
+    : subpref.name
+})
+
+// 現存するかどうか
+const isExisting = computed(() => {
+  if (!props.selectedMunicipality?.versions.length) return false
+  const lastVersion =
+    props.selectedMunicipality.versions[props.selectedMunicipality.versions.length - 1]
+  return !lastVersion?.valid_to || lastVersion.valid_to.trim() === ''
+})
+
+// 消滅イベント
+const extinctionEvent = computed(() => {
+  const versions = props.selectedMunicipality?.versions
+  if (isExisting.value || !versions || versions.length === 0) return null
+
+  const lastVersion = versions[versions.length - 1]
+  if (!lastVersion) return null
+
+  const events = getGroupedEvents(lastVersion.id)
+  return events.after
+})
+
+// タイムライン項目（初期状態 + イベント）
+const milestones = computed(() => {
+  if (!props.selectedMunicipality?.versions.length) return []
+
+  // 1. まず時系列順（最古が先頭）にソートする
+  const sortedVersions = [...props.selectedMunicipality.versions].sort((a, b) => {
+    const dateA = a.valid_from || '0000-00-00'
+    const dateB = b.valid_from || '0000-00-00'
+    return dateA.localeCompare(dateB)
+  })
+
+  // 2. 時系列順に基づいて属性変更や誕生フラグを計算する
+  const items = sortedVersions.map((v, index) => {
+    const events = getGroupedEvents(v.id)
+    const prevVersion = index > 0 ? sortedVersions[index - 1] : null
+    const attributeChanges = []
+
+    if (prevVersion) {
+      if (v.subprefecture_code !== prevVersion.subprefecture_code) {
+        const before = dataStore.subprefByCode.get(prevVersion.subprefecture_code)?.name || 'なし'
+        const after = dataStore.subprefByCode.get(v.subprefecture_code)?.name || 'なし'
+        attributeChanges.push({ type: '支庁', before, after })
+      }
+      if (v.county_code !== prevVersion.county_code) {
+        const before = dataStore.countyByCode.get(prevVersion.county_code)?.name || 'なし'
+        const after = dataStore.countyByCode.get(v.county_code)?.name || 'なし'
+        attributeChanges.push({ type: '郡', before, after })
+      }
+      if (v.city_code !== prevVersion.city_code) {
+        attributeChanges.push({
+          type: 'JISコード',
+          before: prevVersion.city_code,
+          after: v.city_code,
+        })
+      }
+    }
+
+    return {
+      version: v,
+      beforeEvent: events.before,
+      attributeChanges,
+      isBirth: index === 0,
+      isUnknownBirth:
+        index === 0 && !events.before && (!v.valid_from || v.valid_from.trim() === ''),
+    }
+  })
+
+  // 3. 表示用に最新順（最新が先頭）へ反転させる
+  return items.reverse()
+})
+
+// イベントグループの型定義
+interface GroupedEvent {
+  date: string
+  event_type: string
+  beforeCities: string[]
+  afterCities: string[]
+  beforeCityCodes: string[]
+  afterCityCodes: string[]
+}
+
+// 各バージョンのイベントをキャッシュ
+const eventsCache = new Map<string, { before: GroupedEvent | null; after: GroupedEvent | null }>()
+
+const getGroupedEvents = (versionId: string) => {
+  const cached = eventsCache.get(versionId)
+  if (cached) return cached
+
+  const adjacent = dataStore.getAdjacentEvents(versionId)
+  const result = {
+    before: groupEvents(adjacent.before),
+    after: groupEvents(adjacent.after),
+  }
+  eventsCache.set(versionId, result)
+  return result
+}
+
+// イベントをグループ化する関数
+const groupEvents = (events: Change[]) => {
+  try {
+    if (!events || events.length === 0) return null
+
+    const groups = new Map<string, GroupedEvent>()
+
+    for (const event of events) {
+      if (!event || !event.date || !event.event_type) continue
+
+      const key = `${event.date}-${event.event_type}-${event.city_code_after}`
+
+      if (!groups.has(key)) {
+        groups.set(key, {
+          date: event.date,
+          event_type: event.event_type,
+          beforeCities: [],
+          afterCities: [],
+          beforeCityCodes: [],
+          afterCityCodes: [],
+        })
+      }
+
+      const group = groups.get(key)!
+      const beforeCityData = dataStore.versionById.get(event.city_code_before)
+      const beforeCity = getCityNameByCode(event.city_code_before)
+      const afterCity = getCityNameByCode(event.city_code_after)
+
+      // 管轄変更や境界変更の場合は、名称が同じでも表示に含める（変化を辿りやすくするため）
+      // 名称そのものを比較する。マスターIDが同じなら「自分自身」とみなす
+      const isSelf =
+        props.selectedMunicipality &&
+        beforeCityData?.municipality_id === props.selectedMunicipality.id
+
+      if (beforeCity && !isSelf && !group.beforeCityCodes.includes(event.city_code_before)) {
+        group.beforeCities.push(beforeCity)
+        group.beforeCityCodes.push(event.city_code_before)
+      }
+
+      if (afterCity && !group.afterCityCodes.includes(event.city_code_after)) {
+        group.afterCities.push(afterCity)
+        group.afterCityCodes.push(event.city_code_after)
+      }
+    }
+
+    return Array.from(groups.values())[0] || null
+  } catch (error) {
+    console.error('Error in groupEvents:', error)
+    return null
+  }
+}
+
+// バージョンIDから市区町村（の特定バージョン）を選択
+const selectCityByCode = async (versionId: string) => {
+  const v = dataStore.versionById.get(versionId)
+  if (v) {
+    emit('citySelected', v)
+
+    await nextTick()
+    if (detailContainer.value) {
+      detailContainer.value.scrollIntoView({ behavior: 'smooth' })
+    }
+  }
+}
+
+// バージョンIDから名前を取得
+const getCityNameByCode = (versionId: string) => {
+  const v = dataStore.versionById.get(versionId)
+  if (!v) return `不明なバージョン (${versionId})`
+
+  const m = dataStore.municipalityById.get(v.municipality_id)
+  if (!m) return `不明な自治体 (${v.municipality_id})`
+
+  const pref = dataStore.prefByCode.get(m.prefecture_code)
+  const county = dataStore.countyByCode.get(v.county_code)
+
+  let name = ''
+  if (pref?.name) name += pref.name + ' '
+  if (county?.name) name += county.name + ' '
+  name += m.name
+
+  return name
+}
+
+// 日付フォーマット
+const formatDate = (dateStr: string) => {
+  try {
+    return format(parseISO(dateStr), 'yyyy年M月d日')
+  } catch {
+    return dateStr
+  }
+}
+
+// WikipediaのURLを生成
+const getWikipediaUrl = (name: string) => {
+  return `https://ja.wikipedia.org/wiki/${encodeURIComponent(name.trim())}`
+}
+</script>
+
 <template>
   <div v-if="selectedMunicipality" ref="detailContainer" class="mt-8 pt-6 px-4 md:px-12 lg:px-24">
     <!-- 自治体名表示 -->
@@ -75,7 +345,10 @@
               v-for="(name, idx) in extinctionEvent.afterCities"
               :key="idx"
               class="block p-3 rounded-lg border border-slate-200 bg-slate-50 hover:bg-white hover:border-blue-300 hover:shadow-sm transition-all cursor-pointer text-xs text-slate-700 font-medium"
-              @click="selectCityByCode(extinctionEvent.afterCityCodes[idx])"
+              @click="
+                extinctionEvent.afterCityCodes[idx] &&
+                selectCityByCode(extinctionEvent.afterCityCodes[idx])
+              "
             >
               {{ name }}
             </div>
@@ -86,7 +359,7 @@
       <!-- イベントカード (誕生含む) -->
       <div
         v-for="item in milestones"
-        :key="item.version.code"
+        :key="item.version.id"
         class="relative flex items-center justify-start group is-active"
       >
         <!-- ドット -->
@@ -117,11 +390,11 @@
             }}
           </div>
 
-          <!-- 誕生 (Unknown) -->
-          <div v-if="item.isUnknownBirth" class="mb-4">
+          <!-- 誕生 (イベントがない場合でも「成立」として表示) -->
+          <div v-if="item.isBirth && !item.beforeEvent" class="mb-4">
             <div class="font-semibold mb-1 text-slate-700">成立</div>
           </div>
-          <!-- 誕生 (Known) or 通常イベント -->
+          <!-- 通常のイベント (合併・編入など) -->
           <div v-else-if="item.beforeEvent" class="mb-4">
             <div class="font-semibold mb-1 text-slate-700">
               {{ item.beforeEvent.event_type }}
@@ -131,7 +404,10 @@
                 v-for="(name, idx) in item.beforeEvent.beforeCities"
                 :key="idx"
                 class="block p-3 rounded-lg border border-slate-200 bg-slate-50 hover:bg-white hover:border-blue-300 hover:shadow-sm transition-all cursor-pointer text-xs text-slate-700 font-medium"
-                @click="selectCityByCode(item.beforeEvent.beforeCityCodes[idx])"
+                @click="
+                  item.beforeEvent.beforeCityCodes[idx] &&
+                  selectCityByCode(item.beforeEvent.beforeCityCodes[idx])
+                "
               >
                 {{ name }}
               </div>
@@ -159,239 +435,3 @@
     </div>
   </div>
 </template>
-
-<script setup lang="ts">
-import { ref, nextTick, computed } from 'vue'
-import { format, parseISO } from 'date-fns'
-import { useDataStore } from '@/stores/data'
-import type { City, Municipality } from '@/types/municipality'
-
-// Props定義
-interface Props {
-  selectedCity: City | null
-  selectedMunicipality: Municipality | null
-}
-
-// Emits定義
-interface Emits {
-  (e: 'citySelected', city: City): void
-}
-
-const props = defineProps<Props>()
-const emit = defineEmits<Emits>()
-
-const dataStore = useDataStore()
-const detailContainer = ref<HTMLElement | null>(null)
-
-// 自治体のフルネーム（都道府県名 + [郡名] + 自治体名）
-const fullMunicipalityName = computed(() => {
-  if (!props.selectedMunicipality) return ''
-  const pref = dataStore.prefByCode.get(props.selectedMunicipality.prefecture_code)
-
-  // 最後のバージョンの郡名を取得
-  const lastVersion =
-    props.selectedMunicipality.versions[props.selectedMunicipality.versions.length - 1]
-  const county = lastVersion ? dataStore.countyByCode.get(lastVersion.county_code) : null
-
-  const parts = []
-  if (pref) parts.push(pref.name)
-  if (county) parts.push(county.name)
-  parts.push(props.selectedMunicipality.name)
-
-  return parts.join(' ')
-})
-
-// 自治体のフル読みがな（都道府県読み + [郡読み] + 自治体読み）
-const fullMunicipalityYomi = computed(() => {
-  if (!props.selectedMunicipality) return ''
-  const pref = dataStore.prefByCode.get(props.selectedMunicipality.prefecture_code)
-
-  // 最後のバージョンの郡名を取得
-  const lastVersion =
-    props.selectedMunicipality.versions[props.selectedMunicipality.versions.length - 1]
-  const county = lastVersion ? dataStore.countyByCode.get(lastVersion.county_code) : null
-
-  const parts = []
-  if (pref?.yomi) parts.push(pref.yomi)
-  if (county?.yomi) parts.push(county.yomi)
-  parts.push(props.selectedMunicipality.yomi)
-
-  return parts.join(' ')
-})
-
-// 最新の支庁情報
-const latestSubprefectureInfo = computed(() => {
-  if (!props.selectedMunicipality?.versions.length) return ''
-  const lastVersion =
-    props.selectedMunicipality.versions[props.selectedMunicipality.versions.length - 1]!
-  const subpref = dataStore.subprefByCode.get(lastVersion.subprefecture_code)
-  if (!subpref?.name) return ''
-  return subpref.yomi && subpref.yomi.trim() !== ''
-    ? `${subpref.name} (${subpref.yomi})`
-    : subpref.name
-})
-
-// 現存するかどうか
-const isExisting = computed(() => {
-  if (!props.selectedMunicipality?.versions.length) return false
-  const lastVersion =
-    props.selectedMunicipality.versions[props.selectedMunicipality.versions.length - 1]
-  return !lastVersion?.valid_to || lastVersion.valid_to.trim() === ''
-})
-
-// 消滅イベント
-const extinctionEvent = computed(() => {
-  if (isExisting.value || !props.selectedMunicipality?.versions.length) return null
-  const lastVersion =
-    props.selectedMunicipality.versions[props.selectedMunicipality.versions.length - 1]!
-  const events = getGroupedEvents(lastVersion.code)
-  return events.after
-})
-
-// タイムライン項目（初期状態 + イベント）
-const milestones = computed(() => {
-  if (!props.selectedMunicipality?.versions.length) return []
-
-  const items = props.selectedMunicipality.versions.map((v, index) => {
-    const events = getGroupedEvents(v.code)
-    const prevVersion = index > 0 ? props.selectedMunicipality!.versions[index - 1] : null
-    const attributeChanges = []
-
-    if (prevVersion) {
-      // 支庁の変更をチェック
-      if (v.subprefecture_code !== prevVersion.subprefecture_code) {
-        const before = dataStore.subprefByCode.get(prevVersion.subprefecture_code)?.name || 'なし'
-        const after = dataStore.subprefByCode.get(v.subprefecture_code)?.name || 'なし'
-        attributeChanges.push({ type: '支庁', before, after })
-      }
-      // 郡の変更をチェック
-      if (v.county_code !== prevVersion.county_code) {
-        const before = dataStore.countyByCode.get(prevVersion.county_code)?.name || 'なし'
-        const after = dataStore.countyByCode.get(v.county_code)?.name || 'なし'
-        attributeChanges.push({ type: '郡', before, after })
-      }
-    }
-
-    return {
-      version: v,
-      beforeEvent: events.before,
-      attributeChanges,
-      isBirth: index === 0,
-      isUnknownBirth: index === 0 && !events.before,
-    }
-  })
-  return items.reverse()
-})
-
-// 各バージョンのイベントをキャッシュ
-const eventsCache = new Map<string, any>()
-
-const getGroupedEvents = (cityCode: string) => {
-  if (eventsCache.has(cityCode)) return eventsCache.get(cityCode)
-
-  const adjacent = dataStore.getAdjacentEvents(cityCode)
-  const result = {
-    before: groupEvents(adjacent.before),
-    after: groupEvents(adjacent.after),
-  }
-  eventsCache.set(cityCode, result)
-  return result
-}
-
-// イベントをグループ化する関数
-const groupEvents = (events: any[]) => {
-  try {
-    if (!events || events.length === 0) return null
-
-    const groups = new Map<string, any>()
-
-    for (const event of events) {
-      if (!event || !event.date || !event.event_type) continue
-
-      const key = `${event.date}-${event.event_type}-${event.city_code_after}`
-
-      if (!groups.has(key)) {
-        groups.set(key, {
-          date: event.date,
-          event_type: event.event_type,
-          beforeCities: [],
-          afterCities: [],
-          beforeCityCodes: [],
-          afterCityCodes: [],
-        })
-      }
-
-      const group = groups.get(key)!
-      const beforeCityData = dataStore.cityByCode.get(event.city_code_before)
-      const beforeCity = getCityNameByCode(event.city_code_before)
-      const afterCity = getCityNameByCode(event.city_code_after)
-
-      // 管轄変更や境界変更の場合は、名称が同じでも表示に含める（変化を辿りやすくするため）
-      // endsWithだと「上湧別町」が「湧別町」にマッチしてしまうため、名称そのものを比較する
-      const isSelf =
-        props.selectedMunicipality &&
-        beforeCityData?.name === props.selectedMunicipality.name &&
-        event.event_type !== '管轄変更' &&
-        event.event_type !== '境界変更'
-
-      if (beforeCity && !isSelf && !group.beforeCityCodes.includes(event.city_code_before)) {
-        group.beforeCities.push(beforeCity)
-        group.beforeCityCodes.push(event.city_code_before)
-      }
-
-      if (afterCity && !group.afterCityCodes.includes(event.city_code_after)) {
-        group.afterCities.push(afterCity)
-        group.afterCityCodes.push(event.city_code_after)
-      }
-    }
-
-    return Array.from(groups.values())[0] || null
-  } catch (error) {
-    console.error('Error in groupEvents:', error)
-    return null
-  }
-}
-
-// 市区町村コードから市区町村を選択
-const selectCityByCode = async (cityCode: string) => {
-  const city = dataStore.cityByCode.get(cityCode)
-  if (city) {
-    emit('citySelected', city)
-
-    await nextTick()
-    if (detailContainer.value) {
-      detailContainer.value.scrollIntoView({ behavior: 'smooth' })
-    }
-  }
-}
-
-// 市区町村コードから名前を取得
-const getCityNameByCode = (code: string) => {
-  const city = dataStore.cityByCode.get(code)
-  if (!city) return `不明な市区町村 (${code})`
-
-  const pref = dataStore.prefByCode.get(city.prefecture_code)
-  const county = dataStore.countyByCode.get(city.county_code)
-
-  let name = ''
-  if (pref?.name) name += pref.name + ' '
-  if (county?.name) name += county.name + ' '
-  name += city.name
-
-  return name
-}
-
-// 日付フォーマット
-const formatDate = (dateStr: string) => {
-  try {
-    return format(parseISO(dateStr), 'yyyy年M月d日')
-  } catch (error) {
-    return dateStr
-  }
-}
-
-// WikipediaのURLを生成
-const getWikipediaUrl = (name: string) => {
-  return `https://ja.wikipedia.org/wiki/${encodeURIComponent(name.trim())}`
-}
-</script>
