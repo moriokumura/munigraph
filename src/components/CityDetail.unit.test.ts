@@ -2,11 +2,12 @@ import { describe, it, expect } from 'vitest'
 import { mount } from '@vue/test-utils'
 import { createTestingPinia } from '@pinia/testing'
 import CityDetail from './CityDetail.vue'
-import type { City } from '@/types/municipality'
+import type { City, Municipality } from '@/types/municipality'
 
 describe('CityDetail.vue', () => {
   const mockCity: City = {
     code: '01233_19720401',
+    city_code: '01233',
     name: '伊達市',
     yomi: 'だてし',
     prefecture_code: '01',
@@ -18,6 +19,7 @@ describe('CityDetail.vue', () => {
 
   const mockHistoryCity: City = {
     code: '01576_initial',
+    city_code: '01576',
     name: '伊達町',
     yomi: 'だてちょう',
     prefecture_code: '01',
@@ -25,6 +27,14 @@ describe('CityDetail.vue', () => {
     county_code: '01069',
     valid_from: '1900-01-01',
     valid_to: '1972-04-01',
+  }
+
+  const mockMunicipality: Municipality = {
+    id: '01233-伊達市',
+    name: '伊達市',
+    yomi: 'だてし',
+    prefecture_code: '01',
+    versions: [mockCity],
   }
 
   it('現存する自治体の存続期間が正しく表示されること', () => {
@@ -43,6 +53,7 @@ describe('CityDetail.vue', () => {
     const wrapper = mount(CityDetail, {
       props: {
         selectedCity: mockCity,
+        selectedMunicipality: mockMunicipality,
       },
       global: {
         plugins: [pinia],
@@ -53,6 +64,14 @@ describe('CityDetail.vue', () => {
   })
 
   it('消滅した自治体の存続期間が正しく表示されること', () => {
+    const mockMuniExtinct: Municipality = {
+      id: '01576-伊達町',
+      name: '伊達町',
+      yomi: 'だてちょう',
+      prefecture_code: '01',
+      versions: [mockHistoryCity],
+    }
+
     const pinia = createTestingPinia({
       initialState: {
         data: {
@@ -68,6 +87,7 @@ describe('CityDetail.vue', () => {
     const wrapper = mount(CityDetail, {
       props: {
         selectedCity: mockHistoryCity,
+        selectedMunicipality: mockMuniExtinct,
       },
       global: {
         plugins: [pinia],
@@ -108,6 +128,7 @@ describe('CityDetail.vue', () => {
     const wrapper = mount(CityDetail, {
       props: {
         selectedCity: mockCity,
+        selectedMunicipality: mockMunicipality,
       },
       global: {
         plugins: [pinia],

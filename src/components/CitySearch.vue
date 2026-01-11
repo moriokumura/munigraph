@@ -207,7 +207,7 @@
             <!-- アクションボタン -->
             <div class="flex justify-between items-center pt-6 border-t border-gray-100 mt-6">
               <div class="text-sm text-gray-600">
-                <span class="font-medium text-blue-600">{{ filteredCities.length }}</span
+                <span class="font-medium text-blue-600">{{ filteredMunicipalities.length }}</span
                 >件を表示中
               </div>
               <button
@@ -228,7 +228,7 @@
 <script setup lang="ts">
 import { ref, computed, watch } from 'vue'
 import { useDataStore } from '@/stores/data'
-import type { City } from '@/types/municipality'
+import type { City, Municipality } from '@/types/municipality'
 
 // Props定義
 interface Props {
@@ -238,7 +238,7 @@ interface Props {
 // Emits定義
 interface Emits {
   (e: 'citySelected', city: City): void
-  (e: 'filteredCitiesChanged', cities: City[]): void
+  (e: 'filteredMunicipalitiesChanged', municipalities: Municipality[]): void
 }
 
 defineProps<Props>()
@@ -301,56 +301,59 @@ const resetFilters = () => {
 }
 
 // 検索結果を計算（検索クエリとフィルター条件を組み合わせて適用）
-const filteredCities = computed(() => {
+const filteredMunicipalities = computed(() => {
   if (!dataStore.loaded) return []
 
-  // まず検索クエリで絞り込み（市区町村名、読み仮名、都道府県名、郡名で検索）
-  let cities = dataStore.searchCities(searchQuery.value)
+  // まず検索クエリで絞り込み
+  let municipalities = dataStore.searchMunicipalities(searchQuery.value)
 
-  // フィルター適用（現存/消滅、都道府県、支庁、郡、自治体の種類での絞り込み）
-  cities = cities.filter(city => {
-    // 現存/消滅フィルター：valid_toが空の場合は現存自治体
-    const isExisting = !city.valid_to || city.valid_to.trim() === ''
-    if (isExisting && !showExisting.value) return false
-    if (!isExisting && !showExtinct.value) return false
+  // フィルター適用
+  municipalities = municipalities.filter(m => {
+    // 少なくとも1つのバージョンがフィルター条件を満たせば表示
+    return m.versions.some(v => {
+      // 現存/消滅フィルター
+      const isExisting = !v.valid_to || v.valid_to.trim() === ''
+      if (isExisting && !showExisting.value) return false
+      if (!isExisting && !showExtinct.value) return false
 
-    // 自治体の種類フィルター
-    const cityType = city.name?.endsWith('市')
-      ? 'city'
-      : city.name?.endsWith('町')
-        ? 'town'
-        : city.name?.endsWith('村')
-          ? 'village'
-          : city.name?.endsWith('区')
-            ? 'ward'
-            : null
+      // 自治体の種類フィルター
+      const cityType = v.name?.endsWith('市')
+        ? 'city'
+        : v.name?.endsWith('町')
+          ? 'town'
+          : v.name?.endsWith('村')
+            ? 'village'
+            : v.name?.endsWith('区')
+              ? 'ward'
+              : null
 
-    if (cityType === 'city' && !showCity.value) return false
-    if (cityType === 'town' && !showTown.value) return false
-    if (cityType === 'village' && !showVillage.value) return false
-    if (cityType === 'ward' && !showSpecialWard.value) return false
+      if (cityType === 'city' && !showCity.value) return false
+      if (cityType === 'town' && !showTown.value) return false
+      if (cityType === 'village' && !showVillage.value) return false
+      if (cityType === 'ward' && !showSpecialWard.value) return false
 
-    // 都道府県フィルター
-    if (selectedPrefecture.value && city.prefecture_code !== selectedPrefecture.value) return false
+      // 都道府県フィルター
+      if (selectedPrefecture.value && v.prefecture_code !== selectedPrefecture.value) return false
 
-    // 支庁フィルター（都道府県が選択されている場合のみ適用）
-    if (selectedSubprefecture.value && city.subprefecture_code !== selectedSubprefecture.value)
-      return false
+      // 支庁フィルター
+      if (selectedSubprefecture.value && v.subprefecture_code !== selectedSubprefecture.value)
+        return false
 
-    // 郡フィルター（都道府県が選択されている場合のみ適用）
-    if (selectedCounty.value && city.county_code !== selectedCounty.value) return false
+      // 郡フィルター
+      if (selectedCounty.value && v.county_code !== selectedCounty.value) return false
 
-    return true
+      return true
+    })
   })
 
-  return cities
+  return municipalities
 })
 
 // フィルタリング結果を親コンポーネントに通知
 watch(
-  filteredCities,
-  newCities => {
-    emit('filteredCitiesChanged', newCities)
+  filteredMunicipalities,
+  newMunicipalities => {
+    emit('filteredMunicipalitiesChanged', newMunicipalities)
   },
   { immediate: true }
 )

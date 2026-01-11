@@ -31,7 +31,8 @@ test.describe('Munigraph E2E', () => {
     // 詳細画面が表示されることを確認（h3タグに自治体名が表示される）
     // 複数の h3 があるため、自治体名が含まれるものを特定する
     await expect(page.locator('h3').filter({ hasText: '伊達市' })).toBeVisible()
-    await expect(page.locator('text=所在地:')).toBeVisible()
+    // タイムライン形式のため「所在地:」は複数存在する可能性がある
+    await expect(page.locator('text=所在地:').first()).toBeVisible()
   })
 
   test('チェックボックスで自治体の種類をフィルタリングできる', async ({ page }) => {

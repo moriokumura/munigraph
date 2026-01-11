@@ -1,6 +1,6 @@
 import { defineStore } from 'pinia'
 import { parse, format } from 'date-fns'
-import type { Pref, Subprefecture, County, City, Change } from '@/types/municipality'
+import type { Pref, Subprefecture, County, City, Change, Municipality } from '@/types/municipality'
 import {
   PrefSchema,
   SubprefectureSchema,
@@ -19,8 +19,10 @@ export const useDataStore = defineStore('data', {
     subprefectures: [] as Subprefecture[],
     counties: [] as County[],
     cities: [] as City[],
+    municipalities: [] as Municipality[],
     changes: [] as Change[],
     cityByCode: new Map<string, City>(),
+    municipalityById: new Map<string, Municipality>(),
     eventsByAfter: new Map<string, Change[]>(),
     eventsByBefore: new Map<string, Change[]>(),
     prefByCode: new Map<string, Pref>(),
@@ -70,6 +72,44 @@ export const useDataStore = defineStore('data', {
         this.cities = citiesRaw.map(r => CitySchema.parse(r))
         this.changes = changesRaw.map(r => ChangeSchema.parse(r))
 
+        // 自治体エンティティの集約
+        const mMap = new Map<string, Municipality>()
+        for (const city of this.cities) {
+          // 名前が空のレコードはスキップ（データクレンジング）
+          if (!city.name || city.name.trim() === '') continue
+
+          // 自治体コードと名前の組み合わせでユニークなエンティティを定義
+          // これにより「泊村(01403)」と「泊村(01696)」を分離しつつ、
+          // 同じ自治体のバージョン（年度違いなど）を集約する
+          const mId = `${city.city_code}-${city.name}`
+          if (!mMap.has(mId)) {
+            mMap.set(mId, {
+              id: mId,
+              name: city.name,
+              yomi: city.yomi,
+              prefecture_code: city.prefecture_code,
+              versions: [],
+            })
+          }
+          mMap.get(mId)!.versions.push(city)
+        }
+
+        // 各自治体のバージョンを日付順にソートし、最新の読みを反映
+        for (const m of mMap.values()) {
+          m.versions.sort((a, b) => {
+            const dateA = a.valid_from || '0000-00-00'
+            const dateB = b.valid_from || '0000-00-00'
+            return dateA.localeCompare(dateB)
+          })
+          const latest = m.versions[m.versions.length - 1]
+          if (latest) {
+            m.yomi = latest.yomi
+          }
+        }
+
+        this.municipalities = Array.from(mMap.values())
+        this.municipalityById = mMap
+
         // インデックスを構築
         this.cityByCode = new Map(this.cities.map(c => [c.code, c]))
         this.prefByCode = new Map(this.prefs.map(p => [p.code, p]))
@@ -109,8 +149,10 @@ export const useDataStore = defineStore('data', {
       this.subprefectures = []
       this.counties = []
       this.cities = []
+      this.municipalities = []
       this.changes = []
       this.cityByCode = new Map()
+      this.municipalityById = new Map()
       this.subprefByCode = new Map()
       this.eventsByAfter = new Map()
       this.eventsByBefore = new Map()
@@ -123,49 +165,49 @@ export const useDataStore = defineStore('data', {
     // ========================================
 
     /**
-     * 現存の市区町村を取得
+     * 現存の自治体エンティティを取得
      */
-    getCurrentCities() {
-      const currentCities = this.cities.filter(
-        city =>
-          (!city.valid_to || city.valid_to.trim() === '') && city.name && city.name.trim() !== ''
-      )
-      return currentCities
+    getCurrentMunicipalities() {
+      return this.municipalities.filter(m => m.versions.some(v => !v.valid_to || v.valid_to === ''))
     },
 
     /**
-     * 市区町村を検索（現存・消滅両方を含む）
-     * @param query 検索クエリ（市区町村名、読み仮名、都道府県名、郡名、支庁/振興局名で検索）
+     * 自治体エンティティを検索（現存・消滅両方を含む）
+     * @param query 検索クエリ（自治体名、読み仮名、都道府県名、郡名、支庁/振興局名で検索）
      */
-    searchCities(query: string) {
+    searchMunicipalities(query: string) {
       if (!query.trim()) {
-        // 検索クエリが空の場合は、現存・消滅両方の市区町村を返す
-        return this.cities.filter(city => city.name && city.name.trim() !== '')
+        return this.municipalities
       }
 
       const lowerQuery = query.toLowerCase()
-      return this.cities.filter(city => {
-        if (!city.name || city.name.trim() === '') return false // 名前が空の市区町村は除外
-        const cityName = city.name.toLowerCase()
-        const cityYomi = city.yomi.toLowerCase()
-        const pref = this.prefByCode.get(city.prefecture_code)
+      return this.municipalities.filter(m => {
+        const cityName = m.name.toLowerCase()
+        const cityYomi = m.yomi.toLowerCase()
+        const pref = this.prefByCode.get(m.prefecture_code)
         const prefName = pref?.name.toLowerCase() || ''
-        const county = this.countyByCode.get(city.county_code)
-        const countyName = county?.name.toLowerCase() || ''
-        const countyYomi = county?.yomi.toLowerCase() || ''
-        const subpref = this.subprefByCode.get(city.subprefecture_code)
-        const subprefName = subpref?.name.toLowerCase() || ''
-        const subprefYomi = subpref?.yomi.toLowerCase() || ''
 
-        return (
+        // いずれかのバージョンが条件に合致すればOK
+        const matchesQuery =
           cityName.includes(lowerQuery) ||
           cityYomi.includes(lowerQuery) ||
           prefName.includes(lowerQuery) ||
-          countyName.includes(lowerQuery) ||
-          countyYomi.includes(lowerQuery) ||
-          subprefName.includes(lowerQuery) ||
-          subprefYomi.includes(lowerQuery)
-        )
+          m.versions.some(v => {
+            const county = this.countyByCode.get(v.county_code)
+            const countyName = county?.name.toLowerCase() || ''
+            const countyYomi = county?.yomi.toLowerCase() || ''
+            const subpref = this.subprefByCode.get(v.subprefecture_code)
+            const subprefName = subpref?.name.toLowerCase() || ''
+            const subprefYomi = subpref?.yomi.toLowerCase() || ''
+            return (
+              countyName.includes(lowerQuery) ||
+              countyYomi.includes(lowerQuery) ||
+              subprefName.includes(lowerQuery) ||
+              subprefYomi.includes(lowerQuery)
+            )
+          })
+
+        return matchesQuery
       })
     },
 

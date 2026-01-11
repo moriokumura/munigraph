@@ -25,7 +25,7 @@
         <CitySearch
           :selected-city="selectedCity"
           @city-selected="handleCitySelected"
-          @filtered-cities-changed="handleFilteredCitiesChanged"
+          @filtered-municipalities-changed="handleFilteredMunicipalitiesChanged"
         />
       </div>
 
@@ -33,15 +33,19 @@
       <div class="flex-1 flex flex-col lg:flex-row min-h-0">
         <!-- 市区町村一覧 -->
         <CityList
-          :cities="filteredCities"
+          :municipalities="filteredMunicipalities"
           :selected-city="selectedCity"
-          @city-selected="handleCitySelected"
+          @municipality-selected="handleMunicipalitySelected"
         />
 
         <!-- 自治体詳細 -->
         <div class="flex-1 lg:w-1/2 bg-white overflow-y-auto">
           <div class="p-4">
-            <CityDetail :selected-city="selectedCity" @city-selected="handleCitySelected" />
+            <CityDetail
+              :selected-city="selectedCity"
+              :selected-municipality="selectedMunicipality"
+              @city-selected="handleCitySelected"
+            />
           </div>
         </div>
       </div>
@@ -52,23 +56,34 @@
 <script setup lang="ts">
 import { ref, onMounted } from 'vue'
 import { useDataStore } from '@/stores/data'
-import type { City } from '@/types/municipality'
+import type { City, Municipality } from '@/types/municipality'
 import CitySearch from '@/components/CitySearch.vue'
 import CityList from '@/components/CityList.vue'
 import CityDetail from '@/components/CityDetail.vue'
 
 const dataStore = useDataStore()
 const selectedCity = ref<City | null>(null)
-const filteredCities = ref<City[]>([])
+const selectedMunicipality = ref<Municipality | null>(null)
+const filteredMunicipalities = ref<Municipality[]>([])
 
-// 市区町村選択のハンドラー
+// 市区町村（バージョン）選択のハンドラー
 const handleCitySelected = (city: City) => {
   selectedCity.value = city
+  // 該当する自治体エンティティも選択状態にする
+  const mId = `${city.city_code}-${city.name}`
+  selectedMunicipality.value = dataStore.municipalityById.get(mId) || null
+}
+
+// 自治体エンティティ選択のハンドラー
+const handleMunicipalitySelected = (municipality: Municipality) => {
+  selectedMunicipality.value = municipality
+  // 規定のバージョン（最新または現存）を選択
+  selectedCity.value = municipality.versions[municipality.versions.length - 1] || null
 }
 
 // フィルタリング結果を受け取るハンドラー
-const handleFilteredCitiesChanged = (cities: City[]) => {
-  filteredCities.value = cities
+const handleFilteredMunicipalitiesChanged = (municipalities: Municipality[]) => {
+  filteredMunicipalities.value = municipalities
 }
 
 // データを読み込み

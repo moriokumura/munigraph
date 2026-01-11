@@ -26,6 +26,7 @@ export const CountySchema = z.object({
 // 市区町村のスキーマ
 export const CitySchema = z.object({
   code: z.string(),
+  city_code: z.string().default(''),
   name: z.string(),
   yomi: z.string().default(''),
   prefecture_code: z.string(),
@@ -34,6 +35,15 @@ export const CitySchema = z.object({
   valid_from: z.string().default(''),
   valid_to: z.string().default(''),
 })
+
+// 自治体エンティティ（同一名称の全バージョンを集約）
+export interface Municipality {
+  id: string // prefecture_code-name
+  name: string
+  yomi: string
+  prefecture_code: string
+  versions: City[]
+}
 
 // 廃置分合イベントのスキーマ
 export const ChangeSchema = z.object({

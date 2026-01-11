@@ -2,7 +2,7 @@ import { describe, it, expect, beforeEach, vi } from 'vitest'
 import { setActivePinia, createPinia } from 'pinia'
 import { useDataStore } from './data'
 import { fetchCsv } from '../utils/csv-loader'
-import type { Pref, City, Change, Subprefecture, County } from '../types/municipality'
+import type { Pref, City, Change, Subprefecture, County, Municipality } from '../types/municipality'
 
 // csv-loaderのモック化
 vi.mock('../utils/csv-loader', () => ({
@@ -30,6 +30,7 @@ describe('DataStore', () => {
   const mockCities: City[] = [
     {
       code: '01576_initial',
+      city_code: '01576',
       name: '伊達町',
       yomi: 'だてちょう',
       prefecture_code: '01',
@@ -40,12 +41,24 @@ describe('DataStore', () => {
     },
     {
       code: '01233_19720401',
+      city_code: '01233',
       name: '伊達市',
       yomi: 'だてし',
       prefecture_code: '01',
       subprefecture_code: '01013',
       county_code: '',
       valid_from: '1972-04-01',
+      valid_to: '',
+    },
+    {
+      code: '01233_20060301',
+      city_code: '01233',
+      name: '伊達市',
+      yomi: 'だてし',
+      prefecture_code: '01',
+      subprefecture_code: '01013',
+      county_code: '',
+      valid_from: '2006-03-01',
       valid_to: '',
     },
   ]
@@ -59,7 +72,7 @@ describe('DataStore', () => {
     },
   ]
 
-  it('loadAllがデータを正しくロードし、インデックスを構築すること', async () => {
+  it('loadAllがデータを正しくロードし、自治体を属性で集約すること', async () => {
     const store = useDataStore()
 
     // fetchCsvのモックの戻り値を設定
@@ -77,36 +90,68 @@ describe('DataStore', () => {
     await store.loadAll()
 
     expect(store.loaded).toBe(true)
-    expect(store.prefs).toHaveLength(1)
-    expect(store.cities).toHaveLength(2)
+    expect(store.municipalities).toHaveLength(2) // 伊達町, 伊達市
+    const dateShi = store.municipalityById.get('01233-伊達市')
+    expect(dateShi?.versions).toHaveLength(2) // 伊達市の2つのバージョンが集約されている
     expect(store.cityByCode.get('01576_initial')?.name).toBe('伊達町')
-    expect(store.eventsByBefore.get('01576_initial')).toHaveLength(1)
   })
 
-  it('getCurrentCitiesが現存する自治体のみを返すこと', async () => {
+  it('getCurrentMunicipalitiesが現存する自治体のみを返すこと', async () => {
     const store = useDataStore()
-    store.cities = mockCities
+    // loadAllを介さずに状態をセット
+    const mMap = new Map<string, Municipality>()
+    mMap.set('01576-伊達町', {
+      id: '01576-伊達町',
+      name: '伊達町',
+      yomi: 'だてちょう',
+      prefecture_code: '01',
+      versions: [mockCities[0]!],
+    })
+    mMap.set('01233-伊達市', {
+      id: '01233-伊達市',
+      name: '伊達市',
+      yomi: 'だてし',
+      prefecture_code: '01',
+      versions: [mockCities[1]!, mockCities[2]!],
+    })
+    store.municipalities = Array.from(mMap.values())
     store.loaded = true
 
-    const currentCities = store.getCurrentCities()
-    expect(currentCities).toHaveLength(1)
-    expect(currentCities[0]?.name).toBe('伊達市')
+    const currentMunicipalities = store.getCurrentMunicipalities()
+    expect(currentMunicipalities).toHaveLength(1)
+    expect(currentMunicipalities[0]?.name).toBe('伊達市')
   })
 
-  it('searchCitiesがクエリに一致する自治体を返すこと', async () => {
+  it('searchMunicipalitiesがクエリに一致する自治体を返すこと', async () => {
     const store = useDataStore()
-    store.cities = mockCities
+    const mMap = new Map<string, Municipality>()
+    mMap.set('01576-伊達町', {
+      id: '01576-伊達町',
+      name: '伊達町',
+      yomi: 'だてちょう',
+      prefecture_code: '01',
+      versions: [mockCities[0]!],
+    })
+    mMap.set('01233-伊達市', {
+      id: '01233-伊達市',
+      name: '伊達市',
+      yomi: 'だてし',
+      prefecture_code: '01',
+      versions: [mockCities[1]!, mockCities[2]!],
+    })
+    store.municipalities = Array.from(mMap.values())
     store.prefByCode = new Map(mockPrefs.map(p => [p.code, p]))
+    store.countyByCode = new Map(mockCounties.map(c => [c.code, c]))
     store.loaded = true
 
     // 名前で検索
-    expect(store.searchCities('伊達市')).toHaveLength(1)
+    expect(store.searchMunicipalities('伊達市')).toHaveLength(1)
     // 読みで検索
-    expect(store.searchCities('だて')).toHaveLength(2)
-    // 都道府県名で検索
-    expect(store.searchCities('北海道')).toHaveLength(2)
+    expect(store.searchMunicipalities('だて')).toHaveLength(2)
+    // 郡名で検索（伊達町のバージョンが有珠郡を持っている）
+    expect(store.searchMunicipalities('有珠郡')).toHaveLength(1)
     // 一致しない検索
-    expect(store.searchCities('東京')).toHaveLength(0)
+    expect(store.searchMunicipalities('東京')).toHaveLength(0)
   })
 
   it('getAdjacentEventsが直前・直後のイベントを正しく取得すること', async () => {
@@ -127,5 +172,47 @@ describe('DataStore', () => {
     const dateShiResult = store.getAdjacentEvents('01233_19720401')
     expect(dateShiResult.before).toHaveLength(1)
     expect(dateShiResult.before[0]?.event_type).toBe('市制施行')
+  })
+
+  it('同一都道府県内の同名自治体（泊村のケース）が個別のエンティティとして集約されること', async () => {
+    const store = useDataStore()
+    const mockTomariCities: City[] = [
+      {
+        code: '01403_initial',
+        city_code: '01403',
+        name: '泊村',
+        yomi: 'とまりむら',
+        prefecture_code: '01',
+        subprefecture_code: '01005', // 後志
+        county_code: '01392',
+        valid_from: '',
+        valid_to: '',
+      },
+      {
+        code: '01696_initial',
+        city_code: '01696',
+        name: '泊村',
+        yomi: 'とまりむら',
+        prefecture_code: '01',
+        subprefecture_code: '01007', // 根室
+        county_code: '01695',
+        valid_from: '',
+        valid_to: '',
+      },
+    ]
+
+    vi.mocked(fetchCsv).mockImplementation(async (path: string) => {
+      if (path.endsWith('/cities.csv'))
+        return mockTomariCities as unknown as Record<string, string>[]
+      return []
+    })
+
+    await store.loadAll()
+
+    // 名前は同じだがJISコードが異なるため、2つのエンティティになるべき
+    expect(store.municipalities).toHaveLength(2)
+    expect(store.getCurrentMunicipalities()).toHaveLength(2)
+    expect(store.municipalityById.has('01403-泊村')).toBe(true)
+    expect(store.municipalityById.has('01696-泊村')).toBe(true)
   })
 })

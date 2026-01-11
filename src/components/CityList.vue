@@ -1,12 +1,12 @@
 <template>
-  <!-- 市区町村一覧 -->
+  <!-- 自治体一覧 -->
   <div
     class="flex-1 lg:w-1/2 bg-white border-r border-gray-200 flex flex-col max-h-[calc(100vh-200px)] lg:max-h-[calc(100vh-120px)]"
   >
     <div class="p-4 border-b border-gray-200 flex-shrink-0">
       <h3 class="text-lg font-semibold text-gray-900 mb-2">検索結果</h3>
       <div class="text-sm text-gray-600">
-        <span class="font-medium text-blue-600">{{ cities.length }}</span
+        <span class="font-medium text-blue-600">{{ municipalities.length }}</span
         >件
       </div>
     </div>
@@ -16,32 +16,31 @@
       <div class="p-4">
         <div class="grid gap-2">
           <div
-            v-for="city in cities"
-            :key="city.code"
+            v-for="municipality in municipalities"
+            :key="municipality.id"
             class="border border-gray-200 rounded-lg p-4 hover:bg-gray-50 cursor-pointer focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2"
             tabindex="0"
             role="button"
-            @click="selectCity(city)"
-            @keydown.enter="selectCity(city)"
-            @keydown.space.prevent="selectCity(city)"
+            @click="selectMunicipality(municipality)"
+            @keydown.enter="selectMunicipality(municipality)"
+            @keydown.space.prevent="selectMunicipality(municipality)"
           >
             <div class="flex justify-between items-center">
               <div class="flex-1">
                 <h4 class="text-lg">
-                  <span v-if="getCityDisplayParts(city).pref" class="mr-1">{{
-                    getCityDisplayParts(city).pref
+                  <span v-if="getMunicipalityDisplayParts(municipality).pref" class="mr-1">{{
+                    getMunicipalityDisplayParts(municipality).pref
                   }}</span>
-                  <span v-if="getCityDisplayParts(city).county" class="mr-1">{{
-                    getCityDisplayParts(city).county
+                  <span class="font-bold mr-1">{{
+                    getMunicipalityDisplayParts(municipality).name
                   }}</span>
-                  <span class="font-bold mr-1">{{ getCityDisplayParts(city).name }}</span>
-                  <span v-if="getCityDisplayParts(city).yomi">
-                    ({{ getCityDisplayParts(city).yomi }})</span
+                  <span v-if="getMunicipalityDisplayParts(municipality).yomi">
+                    ({{ getMunicipalityDisplayParts(municipality).yomi }})</span
                   >
                   <span
-                    v-if="getCityDisplayParts(city).period"
+                    v-if="getMunicipalityDisplayParts(municipality).period"
                     class="ml-1 px-1.5 py-0.5 bg-gray-100 rounded text-sm"
-                    >{{ getCityDisplayParts(city).period }}</span
+                    >{{ getMunicipalityDisplayParts(municipality).period }}</span
                   >
                 </h4>
               </div>
@@ -56,17 +55,17 @@
 <script setup lang="ts">
 import { format, parseISO } from 'date-fns'
 import { useDataStore } from '@/stores/data'
-import type { City } from '@/types/municipality'
+import type { City, Municipality } from '@/types/municipality'
 
 // Props定義
 interface Props {
-  cities: City[]
+  municipalities: Municipality[]
   selectedCity?: City | null
 }
 
 // Emits定義
 interface Emits {
-  (e: 'citySelected', city: City): void
+  (e: 'municipalitySelected', municipality: Municipality): void
 }
 
 defineProps<Props>()
@@ -74,9 +73,9 @@ const emit = defineEmits<Emits>()
 
 const dataStore = useDataStore()
 
-// 市区町村選択
-const selectCity = (city: City) => {
-  emit('citySelected', city)
+// 自治体選択
+const selectMunicipality = (municipality: Municipality) => {
+  emit('municipalitySelected', municipality)
 }
 
 // 日付をyyyy/MM/dd形式にフォーマット
@@ -89,31 +88,32 @@ const formatDate = (dateStr: string) => {
   }
 }
 
-// 一覧表示用：都道府県名、郡名、自治体名、読み方、存続期間を返す
-const getCityDisplayParts = (city: City) => {
-  const pref = dataStore.prefByCode.get(city.prefecture_code)
-  const county = dataStore.countyByCode.get(city.county_code)
+// 一覧表示用：都道府県名、自治体名、読み方、存続期間を返す
+const getMunicipalityDisplayParts = (m: Municipality) => {
+  const pref = dataStore.prefByCode.get(m.prefecture_code)
 
-  // 存続期間をフォーマット
-  const hasValidFrom = city.valid_from && city.valid_from.trim() !== ''
-  const hasValidTo = city.valid_to && city.valid_to.trim() !== ''
+  // 全バージョンの期間を算出
+  const firstVersion = m.versions[0]
+  const lastVersion = m.versions[m.versions.length - 1]
+
+  const hasValidFrom = firstVersion?.valid_from && firstVersion.valid_from.trim() !== ''
+  const hasValidTo = lastVersion?.valid_to && lastVersion.valid_to.trim() !== ''
 
   let period = ''
   if (!hasValidFrom && !hasValidTo) {
     period = '現存'
   } else if (!hasValidFrom && hasValidTo) {
-    period = `〜${formatDate(city.valid_to)}`
+    period = `〜${formatDate(lastVersion.valid_to)}`
   } else if (hasValidFrom && !hasValidTo) {
-    period = `${formatDate(city.valid_from)}〜現存`
+    period = `${formatDate(firstVersion.valid_from)}〜現存`
   } else if (hasValidFrom && hasValidTo) {
-    period = `${formatDate(city.valid_from)}〜${formatDate(city.valid_to)}`
+    period = `${formatDate(firstVersion.valid_from)}〜${formatDate(lastVersion.valid_to)}`
   }
 
   return {
     pref: pref?.name || '',
-    county: county?.name || '',
-    name: city.name || '',
-    yomi: city.yomi && city.yomi.trim() !== '' ? city.yomi : '',
+    name: m.name || '',
+    yomi: m.yomi && m.yomi.trim() !== '' ? m.yomi : '',
     period: period,
   }
 }
