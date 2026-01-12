@@ -27,15 +27,16 @@ const fullMunicipalityName = computed(() => {
   if (!props.selectedMunicipality) return ''
   const pref = dataStore.prefByCode.get(props.selectedMunicipality.prefecture_code)
 
-  // 最後のバージョンの郡名を取得
-  const lastVersion =
+  // 選択されたバージョンがあればその郡、なければ最後のバージョンの郡名を取得
+  const displayVersion =
+    props.selectedCity ||
     props.selectedMunicipality.versions[props.selectedMunicipality.versions.length - 1]
-  const county = lastVersion ? dataStore.countyByCode.get(lastVersion.county_code) : null
+  const county = displayVersion ? dataStore.countyByCode.get(displayVersion.county_code) : null
 
   const parts = []
   if (pref) parts.push(pref.name)
   if (county) parts.push(county.name)
-  parts.push(props.selectedMunicipality.name)
+  parts.push(displayVersion?.name || props.selectedMunicipality.name)
 
   return parts.join(' ')
 })
@@ -45,15 +46,16 @@ const fullMunicipalityYomi = computed(() => {
   if (!props.selectedMunicipality) return ''
   const pref = dataStore.prefByCode.get(props.selectedMunicipality.prefecture_code)
 
-  // 最後のバージョンの郡名を取得
-  const lastVersion =
+  // 選択されたバージョンがあればその郡、なければ最後のバージョンの郡名を取得
+  const displayVersion =
+    props.selectedCity ||
     props.selectedMunicipality.versions[props.selectedMunicipality.versions.length - 1]
-  const county = lastVersion ? dataStore.countyByCode.get(lastVersion.county_code) : null
+  const county = displayVersion ? dataStore.countyByCode.get(displayVersion.county_code) : null
 
   const parts = []
   if (pref?.yomi) parts.push(pref.yomi)
   if (county?.yomi) parts.push(county.yomi)
-  parts.push(props.selectedMunicipality.yomi)
+  parts.push(displayVersion?.yomi || props.selectedMunicipality.yomi)
 
   return parts.join(' ')
 })
@@ -82,12 +84,12 @@ const isExisting = computed(() => {
 })
 
 // 消滅イベント
-const extinctionEvent = computed(() => {
+const extinctionEvents = computed(() => {
   const versions = props.selectedMunicipality?.versions
-  if (isExisting.value || !versions || versions.length === 0) return null
+  if (isExisting.value || !versions || versions.length === 0) return []
 
   const lastVersion = versions[versions.length - 1]
-  if (!lastVersion) return null
+  if (!lastVersion) return []
 
   const events = getGroupedEvents(props.selectedMunicipality!.id, lastVersion)
   return events.after
@@ -132,11 +134,11 @@ const milestones = computed(() => {
 
     return {
       version: v,
-      beforeEvent: events.before,
+      beforeEvents: events.before,
       attributeChanges,
       isBirth: index === 0,
       isUnknownBirth:
-        index === 0 && !events.before && (!v.valid_from || v.valid_from.trim() === ''),
+        index === 0 && events.before.length === 0 && (!v.valid_from || v.valid_from.trim() === ''),
     }
   })
 
@@ -157,7 +159,7 @@ interface GroupedEvent {
 }
 
 // 各バージョンのイベントをキャッシュ (キーは municipalityId-valid_from)
-const eventsCache = new Map<string, { before: GroupedEvent | null; after: GroupedEvent | null }>()
+const eventsCache = new Map<string, { before: GroupedEvent[]; after: GroupedEvent[] }>()
 
 const getGroupedEvents = (municipalityId: string, version: MunicipalityVersion) => {
   const key = `${municipalityId}-${version.valid_from}`
@@ -174,9 +176,9 @@ const getGroupedEvents = (municipalityId: string, version: MunicipalityVersion) 
 }
 
 // イベントをグループ化する関数
-const groupEvents = (events: Change[], isBefore: boolean) => {
+const groupEvents = (events: Change[], isBefore: boolean): GroupedEvent[] => {
   try {
-    if (!events || events.length === 0) return null
+    if (!events || events.length === 0) return []
 
     const groups = new Map<string, GroupedEvent>()
 
@@ -184,6 +186,7 @@ const groupEvents = (events: Change[], isBefore: boolean) => {
       if (!event || !event.date || !event.event_type) continue
 
       // 自治体IDと日付をキーにする
+      // event_type ごとにグループ化することで、同日の複数イベントを表示できるようにする
       const targetMId = isBefore ? event.municipality_id_after : event.municipality_id_before
       const key = `${event.date}-${event.event_type}-${targetMId}`
 
@@ -225,10 +228,10 @@ const groupEvents = (events: Change[], isBefore: boolean) => {
       }
     }
 
-    return Array.from(groups.values())[0] || null
+    return Array.from(groups.values())
   } catch (error) {
     console.error('Error in groupEvents:', error)
-    return null
+    return []
   }
 }
 
@@ -251,6 +254,12 @@ const getCityNameByIdAndDate = (mId: string, date: string, isEnd: boolean) => {
 
   // バージョン固有の名称があればそれを使用し、なければマスターの名称を使用する
   name += version?.name || m.name
+
+  // 読みがなを追加
+  const yomi = version?.yomi || m.yomi
+  if (yomi) {
+    name += ` (${yomi})`
+  }
 
   return name
 }
@@ -347,48 +356,51 @@ const getEventDisplayName = (type: string, isBirth: boolean) => {
       </div>
 
       <!-- 消滅イベントマーカー -->
-      <div
-        v-if="!isExisting && extinctionEvent"
-        class="relative flex items-center justify-start group is-active"
-      >
-        <!-- ドット -->
+      <template v-if="!isExisting && extinctionEvents.length > 0">
         <div
-          class="flex items-center justify-center w-10 h-10 rounded-full border border-white bg-slate-400 text-white shadow shrink-0 z-10"
+          v-for="(event, eIdx) in extinctionEvents"
+          :key="`extinction-${eIdx}`"
+          class="relative flex items-center justify-start group is-active"
         >
-          <svg class="w-5 h-5" fill="currentColor" viewBox="0 0 24 24">
-            <path
-              d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"
-            />
-          </svg>
-        </div>
-        <!-- カード -->
-        <div class="flex-1 max-w-xl bg-white p-4 rounded border border-slate-200 shadow ml-4">
-          <div class="font-bold text-lg text-slate-900 mb-2">
-            {{ formatDate(extinctionEvent.date) }}
+          <!-- ドット -->
+          <div
+            class="flex items-center justify-center w-10 h-10 rounded-full border border-white bg-slate-400 text-white shadow shrink-0 z-10"
+          >
+            <svg class="w-5 h-5" fill="currentColor" viewBox="0 0 24 24">
+              <path
+                d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"
+              />
+            </svg>
           </div>
-          <div class="font-semibold text-slate-700 mb-1">
-            {{ getEventDisplayName(extinctionEvent.event_type, false) }}
-          </div>
-          <div class="space-y-2 mt-2">
-            <div
-              v-for="(name, idx) in extinctionEvent.afterCities"
-              :key="idx"
-              class="block p-3 rounded-lg border border-slate-200 bg-slate-50 hover:bg-white hover:border-blue-300 hover:shadow-sm transition-all cursor-pointer text-xs text-slate-700 font-medium"
-              @click="
-                extinctionEvent.afterMunicipalityIds[idx] &&
-                extinctionEvent.afterDates[idx] &&
-                selectCityByIdAndDate(
-                  extinctionEvent.afterMunicipalityIds[idx],
-                  extinctionEvent.afterDates[idx]!,
-                  true,
-                )
-              "
-            >
-              {{ name }}
+          <!-- カード -->
+          <div class="flex-1 max-w-xl bg-white p-4 rounded border border-slate-200 shadow ml-4">
+            <div class="font-bold text-lg text-slate-900 mb-2">
+              {{ formatDate(event.date) }}
+            </div>
+            <div class="font-semibold text-slate-700 mb-1">
+              {{ getEventDisplayName(event.event_type, false) }}
+            </div>
+            <div class="space-y-2 mt-2">
+              <div
+                v-for="(name, idx) in event.afterCities"
+                :key="idx"
+                class="block p-3 rounded-lg border border-slate-200 bg-slate-50 hover:bg-white hover:border-blue-300 hover:shadow-sm transition-all cursor-pointer text-xs text-slate-700 font-medium"
+                @click="
+                  event.afterMunicipalityIds[idx] &&
+                  event.afterDates[idx] &&
+                  selectCityByIdAndDate(
+                    event.afterMunicipalityIds[idx],
+                    event.afterDates[idx]!,
+                    true,
+                  )
+                "
+              >
+                {{ name }}
+              </div>
             </div>
           </div>
         </div>
-      </div>
+      </template>
 
       <!-- イベントカード (誕生含む) -->
       <div
@@ -420,41 +432,45 @@ const getEventDisplayName = (type: string, isBirth: boolean) => {
             {{
               item.isUnknownBirth
                 ? '日付未登録'
-                : formatDate(item.beforeEvent?.date || item.version.valid_from)
+                : formatDate(item.beforeEvents[0]?.date || item.version.valid_from)
             }}
           </div>
 
           <!-- 誕生 (イベントがない場合でも「成立」として表示) -->
-          <div v-if="item.isBirth && !item.beforeEvent" class="mb-4">
+          <div v-if="item.isBirth && item.beforeEvents.length === 0" class="mb-4">
             <div class="font-semibold mb-1 text-slate-700">成立</div>
           </div>
           <!-- 通常のイベント (合併・編入など) -->
-          <div v-else-if="item.beforeEvent" class="mb-4">
-            <div class="font-semibold mb-1 text-slate-700">
-              {{ getEventDisplayName(item.beforeEvent.event_type, true) }}
-            </div>
-            <div class="space-y-2 mt-2">
-              <div
-                v-for="(name, idx) in item.beforeEvent.beforeCities"
-                :key="idx"
-                class="block p-3 rounded-lg border border-slate-200 bg-slate-50 hover:bg-white hover:border-blue-300 hover:shadow-sm transition-all cursor-pointer text-xs text-slate-700 font-medium"
-                @click="
-                  item.beforeEvent.beforeMunicipalityIds[idx] &&
-                  item.beforeEvent.beforeDates[idx] &&
-                  selectCityByIdAndDate(
-                    item.beforeEvent.beforeMunicipalityIds[idx],
-                    item.beforeEvent.beforeDates[idx]!,
-                    false,
-                  )
-                "
-              >
-                {{ name }}
+          <template v-else>
+            <div v-for="(event, eIdx) in item.beforeEvents" :key="eIdx" class="mb-4">
+              <div class="font-semibold mb-1 text-slate-700">
+                {{ getEventDisplayName(event.event_type, true) }}
+              </div>
+              <div class="space-y-2 mt-2">
+                <div
+                  v-for="(name, idx) in event.beforeCities"
+                  :key="idx"
+                  class="block p-3 rounded-lg border border-slate-200 bg-slate-50 hover:bg-white hover:border-blue-300 hover:shadow-sm transition-all cursor-pointer text-xs text-slate-700 font-medium"
+                  @click="
+                    event.beforeMunicipalityIds[idx] &&
+                    event.beforeDates[idx] &&
+                    selectCityByIdAndDate(
+                      event.beforeMunicipalityIds[idx],
+                      event.beforeDates[idx]!,
+                      false,
+                    )
+                  "
+                >
+                  {{ name }}
+                </div>
               </div>
             </div>
-          </div>
+          </template>
           <!-- 属性変更（イベントがある場合も、その他の属性変化があれば表示） -->
           <div v-if="item.attributeChanges.length > 0" class="mb-4">
-            <div v-if="!item.beforeEvent" class="font-semibold mb-1 text-slate-500">属性変更</div>
+            <div v-if="item.beforeEvents.length === 0" class="font-semibold mb-1 text-slate-500">
+              属性変更
+            </div>
             <div class="space-y-1">
               <div
                 v-for="(change, cIdx) in item.attributeChanges"
