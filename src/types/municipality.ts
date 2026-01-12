@@ -23,7 +23,7 @@ export const CountySchema = z.object({
   prefecture_code: z.string(),
 })
 
-// 市区町村バージョンのスキーマ（旧City）
+// 自治体バージョンのスキーマ
 export const MunicipalityVersionSchema = z.object({
   municipality_id: z.string(),
   name: z.string().optional(),
@@ -56,13 +56,11 @@ const EVENT_TYPES = [
   '成立',
   '新設',
   '編入',
-  '編入合併',
   '分立',
   '市制施行',
   '町制施行',
-  '区域変更',
   '名称変更',
-  '属性変更',
+  '郡変更',
 ] as const
 
 export type EventType = (typeof EVENT_TYPES)[number]
@@ -76,13 +74,11 @@ export const EVENT_METADATA: Record<EventType, EventMetadata> = {
   成立: { birthName: '成立', extinctionName: '成立' },
   新設: { birthName: '新設合併により誕生', extinctionName: '新設合併により消滅' },
   編入: { birthName: '編入', extinctionName: '編入により消滅' },
-  編入合併: { birthName: '編入合併', extinctionName: '編入合併により消滅' },
   分立: { birthName: '分立により誕生', extinctionName: '分立' },
   市制施行: { birthName: '市制施行', extinctionName: '市制施行' },
   町制施行: { birthName: '町制施行', extinctionName: '町制施行' },
-  区域変更: { birthName: '区域変更', extinctionName: '区域変更' },
   名称変更: { birthName: '名称変更', extinctionName: '名称変更' },
-  属性変更: { birthName: '属性変更', extinctionName: '属性変更' },
+  郡変更: { birthName: '郡変更', extinctionName: '郡変更' },
 }
 
 // 廃置分合イベントのスキーマ

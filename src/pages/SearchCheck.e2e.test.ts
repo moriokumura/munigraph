@@ -72,3 +72,65 @@ test('みよし市のタイムラインが統合されており、重複がな�
   await expect(page.locator('text=みよし町').first()).toBeVisible()
   await expect(page.locator('text=みよし市').first()).toBeVisible()
 })
+
+test('常陸大宮市の複雑な同日イベントが正しく表示されること', async ({ page }) => {
+  await page.goto('/#/browse')
+
+  // データロードを待機
+  await expect(page.locator('text=件を表示中')).toBeVisible()
+
+  const searchInput = page.getByPlaceholder('市区町村名、郡名、都道府県名、読み仮名で検索...')
+
+  // 常陸大宮市で検索
+  await searchInput.clear()
+  await searchInput.fill('常陸大宮市')
+  const row = page.locator('div[role="button"]').filter({ hasText: '常陸大宮市' }).first()
+  await expect(row).toBeVisible()
+
+  // クリックして詳細を表示
+  await row.click()
+
+  // タイムラインのイベント種類を確認
+  // 2004-10-16に発生したイベント群
+  await expect(page.locator('text=市制施行')).toHaveCount(1)
+  await expect(page.locator('text=名称変更')).toHaveCount(1)
+  await expect(page.locator('text=編入')).toHaveCount(1)
+  // 初期状態
+  await expect(page.locator('text=成立')).toHaveCount(1)
+
+  // 編入カードの中身を厳密に検証
+  const transferCard = page
+    .locator('div')
+    .filter({ hasText: /^編入$/ })
+    .locator('..')
+  // 編入された町村のみが表示されていること（計4つ）
+  const transferItems = transferCard.locator('.cursor-pointer')
+  await expect(transferItems).toHaveCount(4)
+  await expect(transferItems.filter({ hasText: '緒川村' })).toBeVisible()
+  await expect(transferItems.filter({ hasText: '美和村' })).toBeVisible()
+  await expect(transferItems.filter({ hasText: '山方町' })).toBeVisible()
+  await expect(transferItems.filter({ hasText: '御前山村' })).toBeVisible()
+
+  // 名称変更のカードに「常陸大宮町」が表示されていること
+  // (名称変更後の名前として表示される)
+  const renameCard = page
+    .locator('div')
+    .filter({ hasText: '名称変更' })
+    .locator('text=常陸大宮町')
+    .first()
+  await expect(renameCard).toBeVisible()
+
+  // 市制施行のカードに「常陸大宮市」が表示されていること
+  const statusCard = page
+    .locator('div')
+    .filter({ hasText: '市制施行' })
+    .locator('text=常陸大宮市')
+    .first()
+  await expect(statusCard).toBeVisible()
+
+  // 編入された町村が表示されていること
+  await expect(page.locator('text=緒川村')).toBeVisible()
+  await expect(page.locator('text=美和村')).toBeVisible()
+  await expect(page.locator('text=山方町')).toBeVisible()
+  await expect(page.locator('text=御前山村')).toBeVisible()
+})

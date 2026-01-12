@@ -87,9 +87,10 @@ test.describe('Munigraph E2E', () => {
     // 3. クリックして詳細を表示
     await results.click()
 
-    // 4. 属性変更「鳳至郡 → 鳳珠郡」が表示されているか確認
-    await expect(page.locator('text=鳳至郡 → 鳳珠郡')).toBeVisible()
-    await expect(page.locator('text=属性変更')).toBeVisible()
+    // 4. 郡変更が表示されているか確認
+    await expect(page.locator('text=郡変更')).toBeVisible()
+    // カード内のテキストを確認（読みがなを含む）
+    await expect(page.locator('text=石川県 鳳珠郡 門前町 (もんぜんまち)')).toBeVisible()
   })
 
   test('自治体を選択するとURLが更新され、ブラウザバックで戻ることができる', async ({ page }) => {
@@ -100,14 +101,14 @@ test.describe('Munigraph E2E', () => {
     await searchInput.fill('札幌市')
     await page.click('text=札幌市')
 
-    // URLに id パラメータが含まれていることを確認 (新形式の ID M00001)
+    // URLに id パラメータが含まれていることを確認 (ID M00001)
     await expect(page).toHaveURL(/.*id=M00001/)
 
     // 2. 旭川市を検索して選択
     await searchInput.fill('旭川市')
     await page.click('text=旭川市')
 
-    // URLが旭川市のIDに更新されていることを確認 (新形式の ID M00004)
+    // URLが旭川市のIDに更新されていることを確認 (ID M00004)
     await expect(page).toHaveURL(/.*id=M00004/)
 
     // 3. ブラウザの「戻る」を実行

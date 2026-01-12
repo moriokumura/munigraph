@@ -176,7 +176,7 @@ describe('DataStore', () => {
       },
     ]
 
-    it('新形式のCSVをロードし、同一ID内で属性変更を自動検知すること', async () => {
+    it('CSVをロードし、同一ID内で郡変更を自動検知すること', async () => {
       const store = useDataStore()
 
       vi.mocked(fetchCsv).mockImplementation(async (path: string) => {
@@ -194,11 +194,11 @@ describe('DataStore', () => {
       expect(horokanai?.name).toBe('幌加内町')
       expect(horokanai?.versions).toHaveLength(2)
 
-      // 属性変更の自動検知（郡が 01040 -> 01050 に変わっている）
+      // 郡変更の自動検知（郡が 01040 -> 01050 に変わっている）
       const adj = store.getAdjacentEvents('M001', horokanai!.versions[1]!)
-      // change_events.csv は空だが、属性変更が自動生成されて before に入っていることを期待
+      // change_events.csv は空だが、郡変更が自動生成されて before に入っていることを期待
       expect(adj.before).toHaveLength(1)
-      expect(adj.before[0]?.event_type).toBe('属性変更')
+      expect(adj.before[0]?.event_type).toBe('郡変更')
     })
   })
 

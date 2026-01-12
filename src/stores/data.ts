@@ -262,20 +262,24 @@ export const useDataStore = defineStore('data', {
         (ev) => ev.date === version.valid_to,
       )
 
-      // 2. 同一自治体内での属性変更を自動検知
+      // 2. 同一自治体内での郡変更を自動検知
       const vIndex = municipality.versions.findIndex((v) => v === version)
       if (vIndex > 0) {
         const prevVersion = municipality.versions[vIndex - 1]!
-        // 前のバージョンとの間に明示的なイベントがない場合、属性変更イベントを生成
-        if (beforeEvents.length === 0) {
-          // 郡の変更をチェック
-          const hasAttributeChange = prevVersion.county_code !== version.county_code
 
-          if (hasAttributeChange) {
+        // 郡の変更をチェック
+        if (prevVersion.county_code !== version.county_code) {
+          const afterCounty = this.countyByCode.get(version.county_code)?.name || 'なし'
+
+          // 市制施行によって郡が「なし」になった場合は自明なので表示しない
+          const isCityNow = (version.name || municipality.name).endsWith('市')
+          const isNowNoCounty = afterCounty === 'なし'
+
+          if (!(isCityNow && isNowNoCounty)) {
             beforeEvents.push({
-              code: `auto_attr_${municipalityId}_${version.valid_from}`,
+              code: `auto_county_${municipalityId}_${version.valid_from}`,
               date: version.valid_from,
-              event_type: '属性変更',
+              event_type: '郡変更',
               municipality_id_before: municipalityId,
               municipality_id_after: municipalityId,
             })

@@ -113,32 +113,14 @@ const milestones = computed(() => {
     return toA.localeCompare(toB)
   })
 
-  // 2. 時系列順に基づいて属性変更や誕生フラグを計算する
+  // 2. 時系列順に基づいてイベントや誕生フラグを計算する
   const items = sortedVersions.map((v, index) => {
     const prevVersion = index > 0 ? sortedVersions[index - 1] : null
     const events = getGroupedEvents(props.selectedMunicipality!.id, v, prevVersion)
-    const attributeChanges = []
-
-    if (prevVersion) {
-      if (v.county_code !== prevVersion.county_code) {
-        const before = dataStore.countyByCode.get(prevVersion.county_code)?.name || 'なし'
-        const after = dataStore.countyByCode.get(v.county_code)?.name || 'なし'
-
-        // 市制施行によって郡が「なし」になった場合は表示しない
-        const isCityNow = (v.name || props.selectedMunicipality!.name).endsWith('市')
-        const wasInCounty = before !== 'なし'
-        const isNowNoCounty = after === 'なし'
-
-        if (!(isCityNow && wasInCounty && isNowNoCounty)) {
-          attributeChanges.push({ type: '郡', before, after })
-        }
-      }
-    }
 
     return {
       version: v,
       beforeEvents: events.before,
-      attributeChanges,
       isBirth: index === 0,
       isUnknownBirth:
         index === 0 && events.before.length === 0 && (!v.valid_from || v.valid_from.trim() === ''),
@@ -146,7 +128,8 @@ const milestones = computed(() => {
   })
 
   // 3. 表示用に最新順（最新が先頭）へ反転させる
-  return items.reverse()
+  const milestones = items.filter((item) => item.isBirth || item.beforeEvents.length > 0)
+  return milestones.reverse()
 })
 
 // イベントグループの型定義
@@ -178,10 +161,13 @@ const getGroupedEvents = (
   // 内部イベントの重複排除：複数のバージョンが同じ日に始まる場合、
   // そのバージョン間の変化に一致するイベントのみを抽出する
   let filteredBefore = adjacent.before
-  if (prevVersion && adjacent.before.length > 1) {
+  if (prevVersion && adjacent.before.length > 0) {
     filteredBefore = adjacent.before.filter((ev) => {
-      // 外部との合体などは常に保持
-      if (ev.municipality_id_before !== ev.municipality_id_after) return true
+      // 外部との合体などは、同日に複数のバージョンがある場合は最初のバージョンのみに表示する
+      // (例: A町がB村を編入しつつC町へ改称し、同日D市へ昇格する場合、編入はA町->C町の変化側に寄せる)
+      if (ev.municipality_id_before !== ev.municipality_id_after) {
+        return prevVersion.valid_from !== version.valid_from
+      }
 
       // 内部イベントの場合、直前のバージョンからの変化と一致するかチェック
       const prevName = prevVersion.name || ''
@@ -206,15 +192,19 @@ const getGroupedEvents = (
   }
 
   const result = {
-    before: groupEvents(filteredBefore, true),
-    after: groupEvents(adjacent.after, false),
+    before: groupEvents(filteredBefore, true, version),
+    after: groupEvents(adjacent.after, false, version),
   }
   eventsCache.set(key, result)
   return result
 }
 
 // イベントをグループ化する関数
-const groupEvents = (events: Change[], isBefore: boolean): GroupedEvent[] => {
+const groupEvents = (
+  events: Change[],
+  isBefore: boolean,
+  currentVersion: MunicipalityVersion,
+): GroupedEvent[] => {
   try {
     if (!events || events.length === 0) return []
 
@@ -251,12 +241,27 @@ const groupEvents = (events: Change[], isBefore: boolean): GroupedEvent[] => {
       }
 
       const group = groups.get(key)!
-      const beforeCity = getCityNameByIdAndDate(bMId, event.date, true)
-      const afterCity = getCityNameByIdAndDate(aMId, event.date, false)
+
+      // 自マスター内での変化（名称変更・地位変更など）の場合、currentVersion の情報を優先的に使う
+      const isInternalEvent = ['名称変更', '市制施行', '町制施行', '郡変更'].includes(
+        event.event_type,
+      )
+
+      let beforeCity = ''
+      let afterCity = ''
+
+      if (isBefore) {
+        // 誕生側：after は今の自分
+        beforeCity = getCityNameByIdAndDate(bMId, event.date, true)
+        afterCity = getFullMunicipalityNameFromVersion(currentVersion)
+      } else {
+        // 消滅側：before は今の自分
+        beforeCity = getFullMunicipalityNameFromVersion(currentVersion)
+        afterCity = getCityNameByIdAndDate(aMId, event.date, false)
+      }
 
       // マスターIDが同じなら「自分自身」とみなす
       const isSelf = props.selectedMunicipality && bMId === props.selectedMunicipality.id
-      const isInternalEvent = ['名称変更', '市制施行', '町制施行'].includes(event.event_type)
 
       // 内部イベントの場合は、自分自身であっても表示に含める（旧字体などの変化を示すため）
       if (
@@ -284,6 +289,26 @@ const groupEvents = (events: Change[], isBefore: boolean): GroupedEvent[] => {
     console.error('Error in groupEvents:', error)
     return []
   }
+}
+
+// バージョンオブジェクトからフルネーム文字列（読み付き）を生成
+const getFullMunicipalityNameFromVersion = (v: MunicipalityVersion) => {
+  const m = dataStore.municipalityById.get(v.municipality_id)
+  if (!m) return ''
+
+  const pref = dataStore.prefByCode.get(m.prefecture_code)
+  const county = dataStore.countyByCode.get(v.county_code)
+
+  let name = ''
+  if (pref?.name) name += pref.name + ' '
+  if (county?.name) name += county.name + ' '
+  name += v.name || m.name
+
+  const yomi = v.yomi || m.yomi
+  if (yomi) {
+    name += ` (${yomi})`
+  }
+  return name
 }
 
 // 自治体IDと日付から、該当するバージョンの名前を取得
@@ -547,8 +572,10 @@ const getEventDisplayName = (type: string, isBirth: boolean) => {
                 {{ getEventDisplayName(event.event_type, true) }}
               </div>
               <div class="space-y-2 mt-2">
-                <!-- 名称変更・市制施行・町制施行の場合は「変更後の名称」を表示、それ以外は「前身の名称」を表示 -->
-                <template v-if="['名称変更', '市制施行', '町制施行'].includes(event.event_type)">
+                <!-- 名称変更・市制施行・町制施行・郡変更の場合は「変更後の名称」を表示、それ以外は「前身の名称」を表示 -->
+                <template
+                  v-if="['名称変更', '市制施行', '町制施行', '郡変更'].includes(event.event_type)"
+                >
                   <div
                     v-for="(name, idx) in event.afterCities"
                     :key="idx"
@@ -578,22 +605,6 @@ const getEventDisplayName = (type: string, isBirth: boolean) => {
               </div>
             </div>
           </template>
-          <!-- 属性変更（イベントがある場合も、その他の属性変化があれば表示） -->
-          <div v-if="item.attributeChanges.length > 0" class="mb-4">
-            <div v-if="item.beforeEvents.length === 0" class="font-semibold mb-1 text-slate-500">
-              属性変更
-            </div>
-            <div class="space-y-1">
-              <div
-                v-for="(change, cIdx) in item.attributeChanges"
-                :key="cIdx"
-                class="text-sm text-slate-600"
-              >
-                <span class="font-medium">{{ change.type }}:</span>
-                {{ change.before }} → {{ change.after }}
-              </div>
-            </div>
-          </div>
 
           <!-- 属性情報（現在は空、将来的に他の属性を追加する場合に使用） -->
           <div class="text-slate-500 text-sm"></div>
