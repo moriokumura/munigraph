@@ -185,6 +185,15 @@ const groupEvents = (events: Change[], isBefore: boolean): GroupedEvent[] => {
     for (const event of events) {
       if (!event || !event.date || !event.event_type) continue
 
+      const bMId = event.municipality_id_before
+      const aMId = event.municipality_id_after
+
+      // 消滅側（isBefore = false）の表示において、自分自身のIDへの遷移はスキップする
+      // (それは次のバージョンの「誕生側」イベントとして表示されるため)
+      if (!isBefore && aMId === props.selectedMunicipality?.id) {
+        continue
+      }
+
       // 自治体IDと日付をキーにする
       // event_type ごとにグループ化することで、同日の複数イベントを表示できるようにする
       const targetMId = isBefore ? event.municipality_id_after : event.municipality_id_before
@@ -204,15 +213,6 @@ const groupEvents = (events: Change[], isBefore: boolean): GroupedEvent[] => {
       }
 
       const group = groups.get(key)!
-      const bMId = event.municipality_id_before
-      const aMId = event.municipality_id_after
-
-      // 追加: 消滅側（isBefore = false）の表示において、自分自身のIDへの遷移はスキップする
-      // (それは次のバージョンの「誕生側」イベントとして表示されるため)
-      if (!isBefore && aMId === props.selectedMunicipality?.id) {
-        continue
-      }
-
       const beforeCity = getCityNameByIdAndDate(bMId, event.date, true)
       const afterCity = getCityNameByIdAndDate(aMId, event.date, false)
 
@@ -234,7 +234,10 @@ const groupEvents = (events: Change[], isBefore: boolean): GroupedEvent[] => {
       }
     }
 
-    return Array.from(groups.values())
+    // 内容があるグループのみを返す
+    return Array.from(groups.values()).filter(
+      (g) => g.beforeCities.length > 0 || g.afterCities.length > 0,
+    )
   } catch (error) {
     console.error('Error in groupEvents:', error)
     return []
@@ -459,7 +462,7 @@ const getEventDisplayName = (type: string, isBirth: boolean) => {
             <!-- 初期の名称（または名称変更後の名称）を表示 -->
             <div class="space-y-2 mt-2">
               <div
-                class="block p-3 rounded-lg border border-slate-200 bg-slate-50 text-xs text-slate-700 font-medium"
+                class="block p-3 rounded-lg border border-slate-200 bg-slate-100 text-xs text-slate-700 font-semibold cursor-default"
               >
                 <!-- バージョン名称を表示 -->
                 {{
@@ -507,7 +510,7 @@ const getEventDisplayName = (type: string, isBirth: boolean) => {
                   <div
                     v-for="(name, idx) in event.afterCities"
                     :key="idx"
-                    class="block p-3 rounded-lg border border-slate-200 bg-slate-50 text-xs text-slate-700 font-medium"
+                    class="block p-3 rounded-lg border border-slate-200 bg-slate-100 text-xs text-slate-700 font-semibold cursor-default"
                   >
                     {{ name }}
                   </div>
