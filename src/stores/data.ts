@@ -115,7 +115,12 @@ export const useDataStore = defineStore('data', {
           m.versions.sort((a, b) => {
             const dateA = a.valid_from || '0000-00-00'
             const dateB = b.valid_from || '0000-00-00'
-            return dateA.localeCompare(dateB)
+            if (dateA !== dateB) return dateA.localeCompare(dateB)
+
+            // 開始日が同じ場合、終了日でソート（短い期間のものが先）
+            const toA = a.valid_to || '9999-12-31'
+            const toB = b.valid_to || '9999-12-31'
+            return toA.localeCompare(toB)
           })
         }
 

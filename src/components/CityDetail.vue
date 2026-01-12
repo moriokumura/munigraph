@@ -91,7 +91,10 @@ const extinctionEvents = computed(() => {
   const lastVersion = versions[versions.length - 1]
   if (!lastVersion) return []
 
-  const events = getGroupedEvents(props.selectedMunicipality!.id, lastVersion)
+  // 直前のバージョンを取得（もしあれば）
+  const prevVersion = versions.length > 1 ? versions[versions.length - 2] : null
+
+  const events = getGroupedEvents(props.selectedMunicipality!.id, lastVersion, prevVersion)
   return events.after
 })
 
@@ -103,13 +106,17 @@ const milestones = computed(() => {
   const sortedVersions = [...props.selectedMunicipality.versions].sort((a, b) => {
     const dateA = a.valid_from || '0000-00-00'
     const dateB = b.valid_from || '0000-00-00'
-    return dateA.localeCompare(dateB)
+    if (dateA !== dateB) return dateA.localeCompare(dateB)
+
+    const toA = a.valid_to || '9999-12-31'
+    const toB = b.valid_to || '9999-12-31'
+    return toA.localeCompare(toB)
   })
 
   // 2. 時系列順に基づいて属性変更や誕生フラグを計算する
   const items = sortedVersions.map((v, index) => {
-    const events = getGroupedEvents(props.selectedMunicipality!.id, v)
     const prevVersion = index > 0 ? sortedVersions[index - 1] : null
+    const events = getGroupedEvents(props.selectedMunicipality!.id, v, prevVersion)
     const attributeChanges = []
 
     if (prevVersion) {
@@ -161,14 +168,49 @@ interface GroupedEvent {
 // 各バージョンのイベントをキャッシュ (キーは municipalityId-valid_from)
 const eventsCache = new Map<string, { before: GroupedEvent[]; after: GroupedEvent[] }>()
 
-const getGroupedEvents = (municipalityId: string, version: MunicipalityVersion) => {
-  const key = `${municipalityId}-${version.valid_from}`
+const getGroupedEvents = (
+  municipalityId: string,
+  version: MunicipalityVersion,
+  prevVersion?: MunicipalityVersion | null,
+) => {
+  const key = `${municipalityId}-${version.valid_from}-${version.name}`
   const cached = eventsCache.get(key)
   if (cached) return cached
 
   const adjacent = dataStore.getAdjacentEvents(municipalityId, version)
+
+  // 内部イベントの重複排除：複数のバージョンが同じ日に始まる場合、
+  // そのバージョン間の変化に一致するイベントのみを抽出する
+  let filteredBefore = adjacent.before
+  if (prevVersion && adjacent.before.length > 1) {
+    filteredBefore = adjacent.before.filter((ev) => {
+      // 外部との合体などは常に保持
+      if (ev.municipality_id_before !== ev.municipality_id_after) return true
+
+      // 内部イベントの場合、直前のバージョンからの変化と一致するかチェック
+      const prevName = prevVersion.name || ''
+      const currName = version.name || ''
+      const prevSuffix = prevName.slice(-1)
+      const currSuffix = currName.slice(-1)
+
+      if (ev.event_type === '名称変更') {
+        // 名称のみが変わった（町->町, 市->市など）場合のみを抽出
+        return prevName !== currName && prevSuffix === currSuffix
+      }
+      if (ev.event_type === '市制施行') {
+        // 町・村から市になった場合
+        return (prevSuffix === '町' || prevSuffix === '村') && currSuffix === '市'
+      }
+      if (ev.event_type === '町制施行') {
+        // 村から町になった場合
+        return prevSuffix === '村' && currSuffix === '町'
+      }
+      return true
+    })
+  }
+
   const result = {
-    before: groupEvents(adjacent.before, true),
+    before: groupEvents(filteredBefore, true),
     after: groupEvents(adjacent.after, false),
   }
   eventsCache.set(key, result)
@@ -218,10 +260,14 @@ const groupEvents = (events: Change[], isBefore: boolean): GroupedEvent[] => {
 
       // マスターIDが同じなら「自分自身」とみなす
       const isSelf = props.selectedMunicipality && bMId === props.selectedMunicipality.id
-      const isNameChange = event.event_type === '名称変更'
+      const isInternalEvent = ['名称変更', '市制施行', '町制施行'].includes(event.event_type)
 
-      // 名称変更の場合は、自分自身であっても表示に含める（旧字体などの変化を示すため）
-      if (beforeCity && (!isSelf || isNameChange) && !group.beforeMunicipalityIds.includes(bMId)) {
+      // 内部イベントの場合は、自分自身であっても表示に含める（旧字体などの変化を示すため）
+      if (
+        beforeCity &&
+        (!isSelf || isInternalEvent) &&
+        !group.beforeMunicipalityIds.includes(bMId)
+      ) {
         group.beforeCities.push(beforeCity)
         group.beforeMunicipalityIds.push(bMId)
         group.beforeDates.push(event.date)
@@ -505,8 +551,8 @@ const getEventDisplayName = (type: string, isBirth: boolean) => {
                 {{ getEventDisplayName(event.event_type, true) }}
               </div>
               <div class="space-y-2 mt-2">
-                <!-- 名称変更の場合は「変更後の名称」を表示、それ以外は「前身の名称」を表示 -->
-                <template v-if="event.event_type === '名称変更'">
+                <!-- 名称変更・市制施行・町制施行の場合は「変更後の名称」を表示、それ以外は「前身の名称」を表示 -->
+                <template v-if="['名称変更', '市制施行', '町制施行'].includes(event.event_type)">
                   <div
                     v-for="(name, idx) in event.afterCities"
                     :key="idx"
