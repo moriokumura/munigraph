@@ -9,7 +9,6 @@
 - TypeScypt
 - Vite
 - Pinia
-- ESlint
 - Tailwind CSS
 
 ## 用意するデータ

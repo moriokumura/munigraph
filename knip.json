@@ -1,0 +1,13 @@
+{
+  "$schema": "https://unpkg.com/knip@5/schema.json",
+  "entry": ["src/main.ts", "index.html", "src/**/*.test.ts", "src/types/**/*.d.ts"],
+  "project": ["src/**/*.{ts,tsx,vue,d.ts}"],
+  "ignore": ["scripts/**", "dist/**"],
+  "ignoreDependencies": ["tailwindcss", "postcss"],
+  "vitest": {
+    "config": ["vitest.config.ts"]
+  },
+  "playwright": {
+    "config": ["playwright.config.ts"]
+  }
+}

@@ -53,7 +53,7 @@ export interface Municipality {
 }
 
 // イベントタイプの定義
-export const EVENT_TYPES = [
+const EVENT_TYPES = [
   '成立',
   '新設',
   '編入',
@@ -68,7 +68,7 @@ export const EVENT_TYPES = [
 
 export type EventType = (typeof EVENT_TYPES)[number]
 
-export interface EventMetadata {
+interface EventMetadata {
   birthName: string // 誕生・継続側の表示名
   extinctionName: string // 消滅・前身側の表示名
 }
