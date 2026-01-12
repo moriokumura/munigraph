@@ -61,12 +61,15 @@ const handleMunicipalitySelected = (municipality: Municipality) => {
 
 // URLから状態を復元
 const restoreStateFromUrl = () => {
+  if (!dataStore.loaded) return
+
   const id = route.query.id as string
   if (id) {
     const municipality = dataStore.municipalityById.get(id)
     if (municipality) {
       selectedMunicipality.value = municipality
       selectedCity.value = municipality.versions[municipality.versions.length - 1] || null
+      scrollToDetailIfNeeded()
     }
   } else {
     selectedMunicipality.value = null
@@ -74,12 +77,13 @@ const restoreStateFromUrl = () => {
   }
 }
 
-// URL（クエリパラメータ）の変化を監視
+// データロード状態とURLクエリの両方を監視
 watch(
-  () => route.query.id,
+  () => [dataStore.loaded, route.query.id],
   () => {
     restoreStateFromUrl()
   },
+  { immediate: true },
 )
 
 // フィルタリング結果を受け取るハンドラー
@@ -90,7 +94,6 @@ const handleFilteredMunicipalitiesChanged = (municipalities: Municipality[]) => 
 // データを読み込み
 onMounted(async () => {
   await dataStore.loadAll()
-  restoreStateFromUrl()
 })
 </script>
 
