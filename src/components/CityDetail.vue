@@ -207,6 +207,12 @@ const groupEvents = (events: Change[], isBefore: boolean): GroupedEvent[] => {
       const bMId = event.municipality_id_before
       const aMId = event.municipality_id_after
 
+      // 追加: 消滅側（isBefore = false）の表示において、自分自身のIDへの遷移はスキップする
+      // (それは次のバージョンの「誕生側」イベントとして表示されるため)
+      if (!isBefore && aMId === props.selectedMunicipality?.id) {
+        continue
+      }
+
       const beforeCity = getCityNameByIdAndDate(bMId, event.date, true)
       const afterCity = getCityNameByIdAndDate(aMId, event.date, false)
 
@@ -243,7 +249,12 @@ const getCityNameByIdAndDate = (mId: string, date: string, isEnd: boolean) => {
   // 日付に一致するバージョンを探す
   // isEnd=true の場合、その日に「消滅」したバージョンを探す
   // isEnd=false の場合、その日に「誕生」したバージョンを探す
-  const version = m.versions.find((v) => (isEnd ? v.valid_to === date : v.valid_from === date))
+  let version = m.versions.find((v) => (isEnd ? v.valid_to === date : v.valid_from === date))
+
+  // 成立時の名称取得の場合、最初のバージョンを使用する
+  if (!version && !isEnd && (date === '' || date === m.versions[0]?.valid_from)) {
+    version = m.versions[0]
+  }
 
   const pref = dataStore.prefByCode.get(m.prefecture_code)
   const county = version ? dataStore.countyByCode.get(version.county_code) : null
@@ -437,32 +448,88 @@ const getEventDisplayName = (type: string, isBirth: boolean) => {
           </div>
 
           <!-- 誕生 (イベントがない場合でも「成立」として表示) -->
-          <div v-if="item.isBirth && item.beforeEvents.length === 0" class="mb-4">
-            <div class="font-semibold mb-1 text-slate-700">成立</div>
+          <div v-if="item.isBirth" class="mb-4">
+            <div class="font-semibold mb-1 text-slate-700">
+              {{
+                item.beforeEvents.length > 0
+                  ? getEventDisplayName(item.beforeEvents[0]!.event_type, true)
+                  : '成立'
+              }}
+            </div>
+            <!-- 初期の名称（または名称変更後の名称）を表示 -->
+            <div class="space-y-2 mt-2">
+              <div
+                class="block p-3 rounded-lg border border-slate-200 bg-slate-50 text-xs text-slate-700 font-medium"
+              >
+                <!-- バージョン名称を表示 -->
+                {{
+                  getCityNameByIdAndDate(selectedMunicipality!.id, item.version.valid_from, false)
+                }}
+              </div>
+            </div>
+
+            <!-- 他の自治体が関わるイベント（新設合併など）がある場合は、前身を表示 -->
+            <template v-if="item.beforeEvents.length > 0">
+              <div v-for="(event, eIdx) in item.beforeEvents" :key="eIdx" class="mt-4">
+                <div
+                  v-if="event.event_type !== '名称変更' && event.event_type !== '成立'"
+                  class="space-y-2 mt-2"
+                >
+                  <div
+                    v-for="(name, idx) in event.beforeCities"
+                    :key="idx"
+                    class="block p-3 rounded-lg border border-slate-200 bg-slate-50 hover:bg-white hover:border-blue-300 hover:shadow-sm transition-all cursor-pointer text-xs text-slate-700 font-medium"
+                    @click="
+                      event.beforeMunicipalityIds[idx] &&
+                      event.beforeDates[idx] &&
+                      selectCityByIdAndDate(
+                        event.beforeMunicipalityIds[idx],
+                        event.beforeDates[idx]!,
+                        false,
+                      )
+                    "
+                  >
+                    {{ name }}
+                  </div>
+                </div>
+              </div>
+            </template>
           </div>
-          <!-- 通常のイベント (合併・編入など) -->
+          <!-- 通常のイベント (合併・編入・名称変更など) -->
           <template v-else>
             <div v-for="(event, eIdx) in item.beforeEvents" :key="eIdx" class="mb-4">
               <div class="font-semibold mb-1 text-slate-700">
                 {{ getEventDisplayName(event.event_type, true) }}
               </div>
               <div class="space-y-2 mt-2">
-                <div
-                  v-for="(name, idx) in event.beforeCities"
-                  :key="idx"
-                  class="block p-3 rounded-lg border border-slate-200 bg-slate-50 hover:bg-white hover:border-blue-300 hover:shadow-sm transition-all cursor-pointer text-xs text-slate-700 font-medium"
-                  @click="
-                    event.beforeMunicipalityIds[idx] &&
-                    event.beforeDates[idx] &&
-                    selectCityByIdAndDate(
-                      event.beforeMunicipalityIds[idx],
-                      event.beforeDates[idx]!,
-                      false,
-                    )
-                  "
-                >
-                  {{ name }}
-                </div>
+                <!-- 名称変更の場合は「変更後の名称」を表示、それ以外は「前身の名称」を表示 -->
+                <template v-if="event.event_type === '名称変更'">
+                  <div
+                    v-for="(name, idx) in event.afterCities"
+                    :key="idx"
+                    class="block p-3 rounded-lg border border-slate-200 bg-slate-50 text-xs text-slate-700 font-medium"
+                  >
+                    {{ name }}
+                  </div>
+                </template>
+                <template v-else>
+                  <div
+                    v-for="(name, idx) in event.beforeCities"
+                    :key="idx"
+                    class="block p-3 rounded-lg border border-slate-200 bg-slate-50 hover:bg-white hover:border-blue-300 hover:shadow-sm transition-all cursor-pointer text-xs text-slate-700 font-medium"
+                    @click="
+                      event.beforeMunicipalityIds[idx] &&
+                      event.beforeDates[idx] &&
+                      selectCityByIdAndDate(
+                        event.beforeMunicipalityIds[idx],
+                        event.beforeDates[idx]!,
+                        false,
+                      )
+                    "
+                  >
+                    {{ name }}
+                  </div>
+                </template>
               </div>
             </div>
           </template>

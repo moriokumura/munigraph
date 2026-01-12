@@ -16,6 +16,7 @@ export async function fetchCsv(path: string): Promise<Record<string, string>[]> 
     header: true,
     skipEmptyLines: true,
     transformHeader: (header: string) => header.trim(),
+    transform: (value: string) => value.trim(),
   })
 
   // パースエラーがある場合は警告を表示
