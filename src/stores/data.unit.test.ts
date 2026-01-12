@@ -46,7 +46,6 @@ describe('DataStore', () => {
   const mockNewVersions: MunicipalityVersion[] = [
     {
       municipality_id: 'M001',
-      city_code: '01576',
       subprefecture_code: '01013',
       county_code: '01069',
       valid_from: '',
@@ -54,7 +53,6 @@ describe('DataStore', () => {
     },
     {
       municipality_id: 'M002',
-      city_code: '01233',
       subprefecture_code: '01013',
       county_code: '',
       valid_from: '1972-04-01',
@@ -62,7 +60,6 @@ describe('DataStore', () => {
     },
     {
       municipality_id: 'M002',
-      city_code: '01233',
       subprefecture_code: '01013',
       county_code: '',
       valid_from: '2006-03-01',
@@ -165,7 +162,6 @@ describe('DataStore', () => {
     const mockTddVersions: MunicipalityVersion[] = [
       {
         municipality_id: 'M001',
-        city_code: '01439',
         subprefecture_code: '01012',
         county_code: '01040',
         valid_from: '',
@@ -173,9 +169,8 @@ describe('DataStore', () => {
       },
       {
         municipality_id: 'M001',
-        city_code: '01472',
         subprefecture_code: '01002',
-        county_code: '01040',
+        county_code: '01050',
         valid_from: '2010-04-01',
         valid_to: '',
       },
@@ -199,7 +194,7 @@ describe('DataStore', () => {
       expect(horokanai?.name).toBe('幌加内町')
       expect(horokanai?.versions).toHaveLength(2)
 
-      // 属性変更の自動検知（支庁が 01012 -> 01002 に変わっている）
+      // 属性変更の自動検知（郡が 01040 -> 01050 に変わっている）
       const adj = store.getAdjacentEvents('M001', horokanai!.versions[1]!)
       // change_events.csv は空だが、属性変更が自動生成されて before に入っていることを期待
       expect(adj.before).toHaveLength(1)

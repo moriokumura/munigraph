@@ -7,7 +7,6 @@ import type { MunicipalityVersion, Municipality } from '@/types/municipality'
 describe('CityDetail.vue', () => {
   const mockCity: MunicipalityVersion = {
     municipality_id: 'M002',
-    city_code: '01233',
     subprefecture_code: '01013',
     county_code: '',
     valid_from: '1972-04-01',
@@ -16,7 +15,6 @@ describe('CityDetail.vue', () => {
 
   const mockHistoryCity: MunicipalityVersion = {
     municipality_id: 'M001',
-    city_code: '01576',
     subprefecture_code: '01013',
     county_code: '01069',
     valid_from: '1900-01-01',

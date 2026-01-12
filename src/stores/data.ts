@@ -216,9 +216,13 @@ export const useDataStore = defineStore('data', {
           const county = this.countyByCode.get(v.county_code)
           const countyName = county?.name.toLowerCase() || ''
           const countyYomi = county?.yomi.toLowerCase() || ''
-          const subpref = this.subprefByCode.get(v.subprefecture_code)
+
+          // 支庁名による検索は現存バージョンの支庁のみを対象とする
+          const isCurrent = !v.valid_to || v.valid_to === ''
+          const subpref = isCurrent ? this.subprefByCode.get(v.subprefecture_code) : null
           const subprefName = subpref?.name.toLowerCase() || ''
           const subprefYomi = subpref?.yomi.toLowerCase() || ''
+
           return (
             vName.includes(lowerQuery) ||
             vYomi.includes(lowerQuery) ||
@@ -264,10 +268,8 @@ export const useDataStore = defineStore('data', {
         const prevVersion = municipality.versions[vIndex - 1]!
         // 前のバージョンとの間に明示的なイベントがない場合、属性変更イベントを生成
         if (beforeEvents.length === 0) {
-          const hasAttributeChange =
-            prevVersion.city_code !== version.city_code ||
-            prevVersion.subprefecture_code !== version.subprefecture_code ||
-            prevVersion.county_code !== version.county_code
+          // 郡の変更をチェック
+          const hasAttributeChange = prevVersion.county_code !== version.county_code
 
           if (hasAttributeChange) {
             beforeEvents.push({

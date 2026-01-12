@@ -63,7 +63,7 @@ const fullMunicipalityYomi = computed(() => {
 // 最新の支庁情報
 const latestSubprefectureInfo = computed(() => {
   const versions = props.selectedMunicipality?.versions
-  if (!versions || versions.length === 0) return ''
+  if (!versions || versions.length === 0 || !isExisting.value) return ''
 
   const lastVersion = versions[versions.length - 1]
   if (!lastVersion) return ''
@@ -120,22 +120,18 @@ const milestones = computed(() => {
     const attributeChanges = []
 
     if (prevVersion) {
-      if (v.subprefecture_code !== prevVersion.subprefecture_code) {
-        const before = dataStore.subprefByCode.get(prevVersion.subprefecture_code)?.name || 'なし'
-        const after = dataStore.subprefByCode.get(v.subprefecture_code)?.name || 'なし'
-        attributeChanges.push({ type: '支庁', before, after })
-      }
       if (v.county_code !== prevVersion.county_code) {
         const before = dataStore.countyByCode.get(prevVersion.county_code)?.name || 'なし'
         const after = dataStore.countyByCode.get(v.county_code)?.name || 'なし'
-        attributeChanges.push({ type: '郡', before, after })
-      }
-      if (v.city_code !== prevVersion.city_code) {
-        attributeChanges.push({
-          type: 'JISコード',
-          before: prevVersion.city_code,
-          after: v.city_code,
-        })
+
+        // 市制施行によって郡が「なし」になった場合は表示しない
+        const isCityNow = (v.name || props.selectedMunicipality!.name).endsWith('市')
+        const wasInCounty = before !== 'なし'
+        const isNowNoCounty = after === 'なし'
+
+        if (!(isCityNow && wasInCounty && isNowNoCounty)) {
+          attributeChanges.push({ type: '郡', before, after })
+        }
       }
     }
 

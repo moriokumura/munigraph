@@ -28,7 +28,6 @@ export const MunicipalityVersionSchema = z.object({
   municipality_id: z.string(),
   name: z.string().optional(),
   yomi: z.string().optional(),
-  city_code: z.string().default(''),
   subprefecture_code: z.string().default(''),
   county_code: z.string().default(''),
   valid_from: z.string().default(''),

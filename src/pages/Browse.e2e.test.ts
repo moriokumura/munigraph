@@ -52,7 +52,7 @@ test.describe('Munigraph E2E', () => {
     await expect(page.locator('text=伊達町').first()).toBeVisible()
   })
 
-  test('幌加内町の支庁変更が正しく表示される', async ({ page }) => {
+  test('幌加内町の支庁が表示される', async ({ page }) => {
     await page.goto('./#/browse')
 
     // 1. 検索窓に「幌加内」と入力
@@ -65,10 +65,11 @@ test.describe('Munigraph E2E', () => {
     // 3. 詳細画面の確認
     await expect(page.locator('h3').filter({ hasText: '幌加内町' })).toBeVisible()
 
-    // 4. タイムラインに支庁変更が表示されているか確認
-    // 「空知総合振興局 → 上川総合振興局」というテキストが含まれているはず
-    await expect(page.locator('text=空知総合振興局 → 上川総合振興局')).toBeVisible()
-    await expect(page.locator('text=属性変更')).toBeVisible()
+    // 4. ヘッダーに支庁が表示されているか確認 (上川総合振興局)
+    await expect(page.locator('text=上川総合振興局')).toBeVisible()
+
+    // 5. タイムラインに支庁変更が表示されていないことを確認
+    await expect(page.locator('text=空知総合振興局 → 上川総合振興局')).not.toBeVisible()
   })
 
   test('門前町の郡名変更とエンティティ集約が正しく機能している', async ({ page }) => {
